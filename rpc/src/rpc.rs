@@ -1,7 +1,12 @@
 //! The `rpc` module implements the Solana RPC interface.
 
 use itertools::Itertools;
-use solana_transaction_status::{BlockHeader, BlockHeaders, EncodedTransaction, UiTransaction, UiCompiledInstruction, UiPartiallyDecodedInstruction, UiParsedInstruction};
+use solana_account_decoder::parse_vote::{UiVoteState, VoteAccountType};
+use solana_sdk::message::AccountKeys;
+use solana_transaction_status::{
+    BlockHeader, BlockHeaders, EncodedTransaction, UiCompiledInstruction, UiParsedInstruction,
+    UiPartiallyDecodedInstruction, UiTransaction,
+};
 
 use {
     crate::{
@@ -1153,42 +1158,63 @@ impl JsonRpcRequestProcessor {
         slot: Slot,
         config: Option<RpcEncodingConfigWrapper<RpcBlockConfig>>,
     ) {
-        const VOTE_PROGRAM_ID: &str = Pubkey::from_str("Vote111111111111111111111111111111111111111");
+        const VOTE_PROGRAM_ID: &str = "Vote111111111111111111111111111111111111111";
         let block = self.get_block(slot, config).await;
         let headers: Vec<BlockHeader>;
 
         for outer_txn in block.unwrap().unwrap().transactions.unwrap() {
             let block_header = match outer_txn.transaction {
-                EncodedTransaction::Json(inner_txn) => { 
-                    
-                    match inner_txn.message{
-                    solana_transaction_status::UiMessage::Parsed(message) =>{
-                       if message.account_keys.into_iter().map(|key| key.pubkey ).collect_vec().contains(VOTE_PROGRAM_ID){
-                        BlockHeader{
-                            vote_signature: Some(inner_txn.signatures[0]),
-                            validator_identity: todo!(),
-                            validator_stake: todo!(),
-                        };
-                      let ixdata = message.instructions[0];
-                      let data = solana_transaction_status::UiInstruction::Parsed(ixdata);
-                        match data {
-                            UiParsedInstruction::PartiallyDecoded(data) =>{ 
-                                let ix=  solana_runtime::vote_parser::parse_vote_instruction_data(data.data.as_bytes()).unwrap();
-                                // ix.0.
-                            },
-                            _ => ()
-                        }
-             
-                       }
-                    },
-                    _ => ()
-                } 
-            },
-                _ => (),
-              };
+                EncodedTransaction::Json(inner_txn) => {
+                    match inner_txn.message {
+                        solana_transaction_status::UiMessage::Parsed(message) => {
+                            if message
+                                .account_keys
+                                .into_iter()
+                                .map(|key| key.pubkey)
+                                .collect_vec()
+                                .contains(&VOTE_PROGRAM_ID.to_string())
+                            {
+                                let header = BlockHeader {
+                                    vote_signature: Some(inner_txn.signatures[0].clone()),
+                                    validator_identity: todo!(),
+                                    validator_stake: todo!(),
+                                };
+                                let ixdata = message.instructions[0];
 
-              
-            }
+                                match ixdata {
+                                    solana_transaction_status::UiInstruction::Compiled(ixdata) => {
+                                        let compiled_ix_data =
+                                            solana_sdk::instruction::CompiledInstruction::new(
+                                                ixdata.program_id_index,
+                                                &ixdata,
+                                                ixdata.accounts,
+                                            );
+                                        match compiled_ix_data {
+                                            compiled_ix_data => {
+                                                let ix =
+                                                solana_transaction_status::parse_vote::parse_vote(
+                                                    &compiled_ix_data,
+                                                    &AccountKeys::new(message.account_keys.into_iter().map(|k| Pubkey::from_str(&k.pubkey.as_str()).unwrap()).collect::<Vec<Pubkey>>().as_ref(), None),
+                                                )
+                                                .unwrap();
+                                                let vote_state =
+                                                    serde_json::from_value::<VoteState>(ix.info)
+                                                        .unwrap();
+                                                header.validator_identity =
+                                                    Some(vote_state.authorized_withdrawer)
+                                            }
+                                            _ => (),
+                                        }
+                                    }
+                                    _ => {}
+                                }
+                            }
+                        }
+                        _ => (),
+                    }
+                }
+                _ => (),
+            };
         }
     }
 
@@ -2212,7 +2238,6 @@ impl JsonRpcRequestProcessor {
             .collect())
     }
 }
-
 fn optimize_filters(filters: &mut [RpcFilterType]) {
     filters.iter_mut().for_each(|filter_type| {
         if let RpcFilterType::Memcmp(compare) = filter_type {
