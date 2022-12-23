@@ -752,6 +752,14 @@ pub struct UiConfirmedBlock {
     pub block_height: Option<u64>,
 }
 
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct BlockHeader {
+    pub vote_signature: Option<String>,
+    pub validator_identity: Option<Pubkey>,
+    pub validator_stake: Option<u64>,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 #[allow(clippy::large_enum_variant)]
 pub enum TransactionWithStatusMeta {

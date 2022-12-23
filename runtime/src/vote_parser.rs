@@ -62,7 +62,7 @@ pub fn parse_vote_transaction(tx: &Transaction) -> Option<ParsedVote> {
     Some((*key, vote, switch_proof_hash, signature))
 }
 
-fn parse_vote_instruction_data(
+pub fn parse_vote_instruction_data(
     vote_instruction_data: &[u8],
 ) -> Option<(VoteTransaction, Option<Hash>)> {
     match limited_deserialize(vote_instruction_data).ok()? {

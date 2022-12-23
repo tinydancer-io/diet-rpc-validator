@@ -1,5 +1,8 @@
 //! The `rpc` module implements the Solana RPC interface.
 
+use itertools::Itertools;
+use solana_transaction_status::{BlockHeader, BlockHeaders, EncodedTransaction, UiTransaction, UiCompiledInstruction, UiPartiallyDecodedInstruction, UiParsedInstruction};
+
 use {
     crate::{
         max_slots::MaxSlots, optimistically_confirmed_bank_tracker::OptimisticallyConfirmedBank,
@@ -1142,6 +1145,51 @@ impl JsonRpcRequestProcessor {
             return Err(RpcCustomError::TransactionHistoryNotAvailable.into());
         }
         Err(RpcCustomError::BlockNotAvailable { slot }.into())
+    }
+
+    pub async fn get_block_headers(
+        &self,
+        blockhash: RpcBlockhash,
+        slot: Slot,
+        config: Option<RpcEncodingConfigWrapper<RpcBlockConfig>>,
+    ) {
+        const VOTE_PROGRAM_ID: &str = Pubkey::from_str("Vote111111111111111111111111111111111111111");
+        let block = self.get_block(slot, config).await;
+        let headers: Vec<BlockHeader>;
+
+        for outer_txn in block.unwrap().unwrap().transactions.unwrap() {
+            let block_header = match outer_txn.transaction {
+                EncodedTransaction::Json(inner_txn) => { 
+                    
+                    match inner_txn.message{
+                    solana_transaction_status::UiMessage::Parsed(message) =>{
+                       if message.account_keys.into_iter().map(|key| key.pubkey ).collect_vec().contains(VOTE_PROGRAM_ID){
+                        BlockHeader{
+                            vote_signature: Some(inner_txn.signatures[0]),
+                            validator_identity: todo!(),
+                            validator_stake: todo!(),
+                        };
+                      let ixdata = message.instructions[0];
+                      let data = solana_transaction_status::UiInstruction::Parsed(ixdata);
+                        match data {
+                            UiParsedInstruction::PartiallyDecoded(data) =>{ 
+                                let ix=  solana_runtime::vote_parser::parse_vote_instruction_data(data.data.as_bytes()).unwrap();
+                                // ix.0.
+                            },
+                            _ => ()
+                        }
+             
+                       }
+                    },
+                    _ => ()
+                } 
+            },
+                _ => (),
+              };
+
+              
+            }
+        }
     }
 
     pub async fn get_blocks(
