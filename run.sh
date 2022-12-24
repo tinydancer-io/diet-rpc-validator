@@ -1,18 +1,13 @@
-#!/usr/bin/env bash
 
-cat <<'EOF'
-
-  WARNING! LEGACY SHELL SCRIPT
-
-  You almost certainly do not want to run this script!
-
-  If you are a dapp developer and looking for a way to run a local validator, please
-  see https://docs.solana.com/developing/test-validator
-
-  If you are a prospective validator, please see https://docs.solana.com/running-validator
-
-  If you are a core developer, many apologies for what you're about to endure, but
-  you may be in the right place.  This script is now located at `./scripts/run.sh`.
-  Please update whatever docs lead you here to reflect this change
-
-EOF
+cargo run --release \
+  -- --identity ./test-keypair.json \
+  --vote-account ./test-keypair.json \
+  --rpc-port 8899 \
+  --entrypoint entrypoint.devnet.solana.com:8001 \
+  --limit-ledger-size \
+  --log ./solana-validator.log \
+  --no-voting \
+  --no-os-network-limits-test \
+  --skip-poh-verify \
+  --no-incremental-snapshots \
+  --no-poh-speed-test

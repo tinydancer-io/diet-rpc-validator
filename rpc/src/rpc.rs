@@ -1,7 +1,11 @@
 //! The `rpc` module implements the Solana RPC interface.
 
 use itertools::Itertools;
-use solana_account_decoder::parse_vote::{UiVoteState, VoteAccountType};
+use solana_account_decoder::{
+    parse_stake::UiStakeAccount,
+    parse_vote::{UiVoteState, VoteAccountType},
+    UiAccountData,
+};
 use solana_sdk::message::AccountKeys;
 use solana_transaction_status::{
     BlockHeader, EncodedTransaction, UiCompiledInstruction, UiParsedInstruction,
@@ -1202,7 +1206,35 @@ impl JsonRpcRequestProcessor {
                                                         .unwrap();
                                                 header.validator_identity =
                                                     Some(vote_state.node_pubkey);
-                                                // vote_state.
+                                                let stake_account = self.get_account_info(
+                                                    &Pubkey::from_str(
+                                                        message.account_keys[1].pubkey.as_str(),
+                                                    )
+                                                    .unwrap(),
+                                                    None,
+                                                );
+                                                let stake_acc =
+                                                    stake_account.unwrap().value.unwrap().data;
+
+                                                match stake_acc.clone() {
+                                                    UiAccountData::Json(stake_acc) => {
+                                                        let parsed = serde_json::from_value::<
+                                                            UiStakeAccount,
+                                                        >(
+                                                            stake_acc.parsed
+                                                        );
+                                                        println!(
+                                                            "{:?}",
+                                                            parsed
+                                                                .unwrap()
+                                                                .stake
+                                                                .unwrap()
+                                                                .delegation
+                                                                .stake
+                                                        );
+                                                    }
+                                                    _ => (),
+                                                };
 
                                                 let node_balance_position = message
                                                     .account_keys
@@ -6981,110 +7013,26 @@ pub mod tests {
     }
     #[test]
     fn test_get_block_headers() {
-        let mut rpc = RpcHandler::start();
-        let confirmed_block_signatures = rpc.create_test_transactions_and_populate_blockstore();
-
-        let request = create_test_request("getBlockHeaders", Some(json!([0u64])));
-        let result: Option<Vec<BlockHeader>> =
-            parse_success_result(rpc.handle_request_sync(request));
-
-        // let confirmed_block = result.unwrap();
-        println!("out: {:?}", result);
-        // assert_eq!(confirmed_block.transactions.len(), 2);
-        // assert_eq!(confirmed_block.rewards, vec![]);
-
-        // for EncodedTransactionWithStatusMeta {
-        //     transaction,
-        //     meta,
-        //     version,
-        // } in confirmed_block.transactions.into_iter()
-        // {
-        //     assert_eq!(
-        //         version, None,
-        //         "requests which don't set max_supported_transaction_version shouldn't receive a version"
-        //     );
-        //     if let EncodedTransaction::Json(transaction) = transaction {
-        //         if transaction.signatures[0] == confirmed_block_signatures[0].to_string() {
-        //             let meta = meta.unwrap();
-        //             assert_eq!(meta.status, Ok(()));
-        //             assert_eq!(meta.err, None);
-        //         } else if transaction.signatures[0] == confirmed_block_signatures[1].to_string() {
-        //             let meta = meta.unwrap();
-        //             assert_eq!(
-        //                 meta.err,
-        //                 Some(TransactionError::InstructionError(
-        //                     0,
-        //                     InstructionError::Custom(1)
-        //                 ))
-        //             );
-        //             assert_eq!(
-        //                 meta.status,
-        //                 Err(TransactionError::InstructionError(
-        //                     0,
-        //                     InstructionError::Custom(1)
-        //                 ))
-        //             );
-        //         } else {
-        //             assert_eq!(meta, None);
-        //         }
-        //     }
-        // }
-
-        // let request = create_test_request("getBlockHeaders", Some(json!([0u64, "binary"])));
-        // let result: Option<EncodedConfirmedBlock> =
-        //     parse_success_result(rpc.handle_request_sync(request));
-        // let confirmed_block = result.unwrap();
-        // assert_eq!(confirmed_block.transactions.len(), 2);
-        // assert_eq!(confirmed_block.rewards, vec![]);
-
-        // for EncodedTransactionWithStatusMeta {
-        //     transaction,
-        //     meta,
-        //     version,
-        // } in confirmed_block.transactions.into_iter()
-        // {
-        //     assert_eq!(
-        //         version, None,
-        //         "requests which don't set max_supported_transaction_version shouldn't receive a version"
-        //     );
-        //     if let EncodedTransaction::LegacyBinary(transaction) = transaction {
-        //         let decoded_transaction: Transaction =
-        //             deserialize(&bs58::decode(&transaction).into_vec().unwrap()).unwrap();
-        //         if decoded_transaction.signatures[0] == confirmed_block_signatures[0] {
-        //             let meta = meta.unwrap();
-        //             assert_eq!(meta.status, Ok(()));
-        //             assert_eq!(meta.err, None);
-        //         } else if decoded_transaction.signatures[0] == confirmed_block_signatures[1] {
-        //             let meta = meta.unwrap();
-        //             assert_eq!(
-        //                 meta.err,
-        //                 Some(TransactionError::InstructionError(
-        //                     0,
-        //                     InstructionError::Custom(1)
-        //                 ))
-        //             );
-        //             assert_eq!(
-        //                 meta.status,
-        //                 Err(TransactionError::InstructionError(
-        //                     0,
-        //                     InstructionError::Custom(1)
-        //                 ))
-        //             );
-        //         } else {
-        //             assert_eq!(meta, None);
-        //         }
-        //     }
-        // }
-
-        // disable rpc-tx-history
-        // rpc.meta.config.enable_rpc_transaction_history = false;
-        // let request = create_test_request("getBlockHeaders", Some(json!([0u64])));
-        // let response = parse_failure_response(rpc.handle_request_sync(request));
-        // let expected = (
-        //     JSON_RPC_SERVER_ERROR_TRANSACTION_HISTORY_NOT_AVAILABLE,
-        //     String::from("Transaction history is not available from this node"),
-        // );
-        // println!("out: {:?}", response);
+        let server_details = "107.155.66.146:8899";
+        let faucet_addr: SocketAddr = server_details
+            .parse()
+            .expect("Unable to parse socket address");
+        let config = JsonRpcConfig {
+            faucet_addr: Some(faucet_addr),
+            enable_rpc_transaction_history: true,
+            ..JsonRpcConfig::default_for_test()
+        };
+        let rpc = RpcHandler::start_with_config(config);
+        // let confirmed_block_signatures = rpc.create_test_transactions_and_populate_blockstore();
+        println!("pre req {:?}", rpc.blockstore.highest_slot());
+        let request = create_test_request("getBlockHeaders", Some(json!([184249258])));
+        // println!("res {:?}", result);
+        let req = rpc.handle_request_sync(request);
+        // println!("req {:?}", req);
+        let result: Option<Vec<BlockHeader>> = parse_success_result(req);
+        println!("res {:?}", result);
+        let confirmed_block = result.unwrap();
+        println!("{:?}", confirmed_block);
     }
 
     #[test]
