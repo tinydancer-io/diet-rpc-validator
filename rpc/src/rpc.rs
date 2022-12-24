@@ -3420,7 +3420,7 @@ pub mod rpc_full {
             config: Option<RpcEncodingConfigWrapper<RpcBlockConfig>>,
         ) -> BoxFuture<Result<Option<UiConfirmedBlock>>>;
 
-        #[rpc(meta, name = "getBlock")]
+        #[rpc(meta, name = "getBlockHeaders")]
         fn get_block_headers(
             &self,
             meta: Self::Metadata,
@@ -6978,6 +6978,113 @@ pub mod tests {
             String::from("Transaction history is not available from this node"),
         );
         assert_eq!(response, expected);
+    }
+    #[test]
+    fn test_get_block_headers() {
+        let mut rpc = RpcHandler::start();
+        let confirmed_block_signatures = rpc.create_test_transactions_and_populate_blockstore();
+
+        let request = create_test_request("getBlockHeaders", Some(json!([0u64])));
+        let result: Option<Vec<BlockHeader>> =
+            parse_success_result(rpc.handle_request_sync(request));
+
+        // let confirmed_block = result.unwrap();
+        println!("out: {:?}", result);
+        // assert_eq!(confirmed_block.transactions.len(), 2);
+        // assert_eq!(confirmed_block.rewards, vec![]);
+
+        // for EncodedTransactionWithStatusMeta {
+        //     transaction,
+        //     meta,
+        //     version,
+        // } in confirmed_block.transactions.into_iter()
+        // {
+        //     assert_eq!(
+        //         version, None,
+        //         "requests which don't set max_supported_transaction_version shouldn't receive a version"
+        //     );
+        //     if let EncodedTransaction::Json(transaction) = transaction {
+        //         if transaction.signatures[0] == confirmed_block_signatures[0].to_string() {
+        //             let meta = meta.unwrap();
+        //             assert_eq!(meta.status, Ok(()));
+        //             assert_eq!(meta.err, None);
+        //         } else if transaction.signatures[0] == confirmed_block_signatures[1].to_string() {
+        //             let meta = meta.unwrap();
+        //             assert_eq!(
+        //                 meta.err,
+        //                 Some(TransactionError::InstructionError(
+        //                     0,
+        //                     InstructionError::Custom(1)
+        //                 ))
+        //             );
+        //             assert_eq!(
+        //                 meta.status,
+        //                 Err(TransactionError::InstructionError(
+        //                     0,
+        //                     InstructionError::Custom(1)
+        //                 ))
+        //             );
+        //         } else {
+        //             assert_eq!(meta, None);
+        //         }
+        //     }
+        // }
+
+        // let request = create_test_request("getBlockHeaders", Some(json!([0u64, "binary"])));
+        // let result: Option<EncodedConfirmedBlock> =
+        //     parse_success_result(rpc.handle_request_sync(request));
+        // let confirmed_block = result.unwrap();
+        // assert_eq!(confirmed_block.transactions.len(), 2);
+        // assert_eq!(confirmed_block.rewards, vec![]);
+
+        // for EncodedTransactionWithStatusMeta {
+        //     transaction,
+        //     meta,
+        //     version,
+        // } in confirmed_block.transactions.into_iter()
+        // {
+        //     assert_eq!(
+        //         version, None,
+        //         "requests which don't set max_supported_transaction_version shouldn't receive a version"
+        //     );
+        //     if let EncodedTransaction::LegacyBinary(transaction) = transaction {
+        //         let decoded_transaction: Transaction =
+        //             deserialize(&bs58::decode(&transaction).into_vec().unwrap()).unwrap();
+        //         if decoded_transaction.signatures[0] == confirmed_block_signatures[0] {
+        //             let meta = meta.unwrap();
+        //             assert_eq!(meta.status, Ok(()));
+        //             assert_eq!(meta.err, None);
+        //         } else if decoded_transaction.signatures[0] == confirmed_block_signatures[1] {
+        //             let meta = meta.unwrap();
+        //             assert_eq!(
+        //                 meta.err,
+        //                 Some(TransactionError::InstructionError(
+        //                     0,
+        //                     InstructionError::Custom(1)
+        //                 ))
+        //             );
+        //             assert_eq!(
+        //                 meta.status,
+        //                 Err(TransactionError::InstructionError(
+        //                     0,
+        //                     InstructionError::Custom(1)
+        //                 ))
+        //             );
+        //         } else {
+        //             assert_eq!(meta, None);
+        //         }
+        //     }
+        // }
+
+        // disable rpc-tx-history
+        // rpc.meta.config.enable_rpc_transaction_history = false;
+        // let request = create_test_request("getBlockHeaders", Some(json!([0u64])));
+        // let response = parse_failure_response(rpc.handle_request_sync(request));
+        // let expected = (
+        //     JSON_RPC_SERVER_ERROR_TRANSACTION_HISTORY_NOT_AVAILABLE,
+        //     String::from("Transaction history is not available from this node"),
+        // );
+        // println!("out: {:?}", response);
     }
 
     #[test]
