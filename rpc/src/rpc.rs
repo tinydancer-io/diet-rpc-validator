@@ -1222,37 +1222,42 @@ impl JsonRpcRequestProcessor {
                                                             UiStakeAccount,
                                                         >(
                                                             stake_acc.parsed
-                                                        );
-                                                        println!(
-                                                            "{:?}",
+                                                        )
+                                                        .unwrap();
+                                                        // println!(
+                                                        //     "{:?}",
+                                                        //     parsed.stake.unwrap().delegation.stake
+                                                        // );
+                                                        header.validator_stake = Some(
                                                             parsed
-                                                                .unwrap()
                                                                 .stake
                                                                 .unwrap()
                                                                 .delegation
                                                                 .stake
+                                                                .parse::<u64>()
+                                                                .unwrap(),
                                                         );
                                                     }
                                                     _ => (),
                                                 };
 
-                                                let node_balance_position = message
-                                                    .account_keys
-                                                    .into_iter()
-                                                    .position(|k| {
-                                                        k.pubkey
-                                                            == vote_state.node_pubkey.to_string()
-                                                    })
-                                                    .unwrap();
+                                                // let node_balance_position = message
+                                                //     .account_keys
+                                                //     .into_iter()
+                                                //     .position(|k| {
+                                                //         k.pubkey
+                                                //             == vote_state.node_pubkey.to_string()
+                                                //     })
+                                                //     .unwrap();
 
-                                                let meta = outer_txn.meta.clone();
-                                                header.validator_stake = Some(
-                                                    meta.clone().unwrap().pre_balances
-                                                        [node_balance_position]
-                                                        - (meta.clone().unwrap().post_balances
-                                                            [node_balance_position]
-                                                            + meta.unwrap().fee),
-                                                );
+                                                // let meta = outer_txn.meta.clone();
+                                                // header.validator_stake = Some(
+                                                //     meta.clone().unwrap().pre_balances
+                                                //         [node_balance_position]
+                                                //         - (meta.clone().unwrap().post_balances
+                                                //             [node_balance_position]
+                                                //             + meta.unwrap().fee),
+                                                // );
                                                 block_headers.push(header);
                                             } // _ => (),
                                         }
