@@ -1259,6 +1259,12 @@ impl JsonRpcRequestProcessor {
                                                 //             + meta.unwrap().fee),
                                                 // );
                                                 block_headers.push(header);
+                                                block_headers.push(BlockHeader {
+                                                    vote_signature: None,
+                                                    validator_identity: None,
+                                                    validator_stake: Some(7),
+                                                });
+                                                info!("reaches here");
                                             } // _ => (),
                                         }
                                     }
