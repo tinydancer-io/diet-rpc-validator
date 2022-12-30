@@ -1,1 +1,1 @@
-cargo b --release
+cargo b -p solana-rpc --release  && cargo b -p solana-test-validator --release 
