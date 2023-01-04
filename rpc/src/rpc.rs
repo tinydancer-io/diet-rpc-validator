@@ -1070,89 +1070,89 @@ impl JsonRpcRequestProcessor {
         slot: Slot,
         config: Option<RpcEncodingConfigWrapper<RpcBlockConfig>>,
     ) -> Result<Option<UiConfirmedBlock>> {
-        // if self.config.enable_rpc_transaction_history {
-        //     let config = config
-        //         .map(|config| config.convert_to_current())
-        //         .unwrap_or_default();
-        //     let encoding = config.encoding.unwrap_or(UiTransactionEncoding::Json);
-        //     let encoding_options = BlockEncodingOptions {
-        //         transaction_details: config.transaction_details.unwrap_or_default(),
-        //         show_rewards: config.rewards.unwrap_or(true),
-        //         max_supported_transaction_version: config.max_supported_transaction_version,
-        //     };
-        //     let commitment = config.commitment.unwrap_or_default();
-        //     check_is_at_least_confirmed(commitment)?;
+        if self.config.enable_rpc_transaction_history {
+            let config = config
+                .map(|config| config.convert_to_current())
+                .unwrap_or_default();
+            let encoding = config.encoding.unwrap_or(UiTransactionEncoding::Json);
+            let encoding_options = BlockEncodingOptions {
+                transaction_details: config.transaction_details.unwrap_or_default(),
+                show_rewards: config.rewards.unwrap_or(true),
+                max_supported_transaction_version: config.max_supported_transaction_version,
+            };
+            let commitment = config.commitment.unwrap_or_default();
+            check_is_at_least_confirmed(commitment)?;
 
-        //     // Block is old enough to be finalized
-        //     if slot
-        //         <= self
-        //             .block_commitment_cache
-        //             .read()
-        //             .unwrap()
-        //             .highest_confirmed_root()
-        //     {
-        //         self.check_status_is_complete(slot)?;
-        //         let result = self.blockstore.get_rooted_block(slot, true);
-        //         self.check_blockstore_root(&result, slot)?;
-        //         let encode_block = |confirmed_block: ConfirmedBlock| -> Result<UiConfirmedBlock> {
-        //             let mut encoded_block = confirmed_block
-        //                 .encode_with_options(encoding, encoding_options)
-        //                 .map_err(RpcCustomError::from)?;
-        //             if slot == 0 {
-        //                 encoded_block.block_time = Some(self.genesis_creation_time());
-        //                 encoded_block.block_height = Some(0);
-        //             }
-        //             Ok(encoded_block)
-        //         };
-        //         if result.is_err() {
-        //             if let Some(bigtable_ledger_storage) = &self.bigtable_ledger_storage {
-        //                 let bigtable_result =
-        //                     bigtable_ledger_storage.get_confirmed_block(slot).await;
-        //                 self.check_bigtable_result(&bigtable_result)?;
-        //                 return bigtable_result.ok().map(encode_block).transpose();
-        //             }
-        //         }
-        //         self.check_slot_cleaned_up(&result, slot)?;
-        //         return result
-        //             .ok()
-        //             .map(ConfirmedBlock::from)
-        //             .map(encode_block)
-        //             .transpose();
-        //     } else if commitment.is_confirmed() {
-        //         // Check if block is confirmed
-        //         let confirmed_bank = self.bank(Some(CommitmentConfig::confirmed()));
-        //         if confirmed_bank.status_cache_ancestors().contains(&slot) {
-        //             self.check_status_is_complete(slot)?;
-        //             let result = self.blockstore.get_complete_block(slot, true);
-        //             return result
-        //                 .ok()
-        //                 .map(ConfirmedBlock::from)
-        //                 .map(|mut confirmed_block| -> Result<UiConfirmedBlock> {
-        //                     if confirmed_block.block_time.is_none()
-        //                         || confirmed_block.block_height.is_none()
-        //                     {
-        //                         let r_bank_forks = self.bank_forks.read().unwrap();
-        //                         if let Some(bank) = r_bank_forks.get(slot) {
-        //                             if confirmed_block.block_time.is_none() {
-        //                                 confirmed_block.block_time =
-        //                                     Some(bank.clock().unix_timestamp);
-        //                             }
-        //                             if confirmed_block.block_height.is_none() {
-        //                                 confirmed_block.block_height = Some(bank.block_height());
-        //                             }
-        //                         }
-        //                     }
+            // Block is old enough to be finalized
+            if slot
+                <= self
+                    .block_commitment_cache
+                    .read()
+                    .unwrap()
+                    .highest_confirmed_root()
+            {
+                self.check_status_is_complete(slot)?;
+                let result = self.blockstore.get_rooted_block(slot, true);
+                self.check_blockstore_root(&result, slot)?;
+                let encode_block = |confirmed_block: ConfirmedBlock| -> Result<UiConfirmedBlock> {
+                    let mut encoded_block = confirmed_block
+                        .encode_with_options(encoding, encoding_options)
+                        .map_err(RpcCustomError::from)?;
+                    if slot == 0 {
+                        encoded_block.block_time = Some(self.genesis_creation_time());
+                        encoded_block.block_height = Some(0);
+                    }
+                    Ok(encoded_block)
+                };
+                if result.is_err() {
+                    if let Some(bigtable_ledger_storage) = &self.bigtable_ledger_storage {
+                        let bigtable_result =
+                            bigtable_ledger_storage.get_confirmed_block(slot).await;
+                        self.check_bigtable_result(&bigtable_result)?;
+                        return bigtable_result.ok().map(encode_block).transpose();
+                    }
+                }
+                self.check_slot_cleaned_up(&result, slot)?;
+                return result
+                    .ok()
+                    .map(ConfirmedBlock::from)
+                    .map(encode_block)
+                    .transpose();
+            } else if commitment.is_confirmed() {
+                // Check if block is confirmed
+                let confirmed_bank = self.bank(Some(CommitmentConfig::confirmed()));
+                if confirmed_bank.status_cache_ancestors().contains(&slot) {
+                    self.check_status_is_complete(slot)?;
+                    let result = self.blockstore.get_complete_block(slot, true);
+                    return result
+                        .ok()
+                        .map(ConfirmedBlock::from)
+                        .map(|mut confirmed_block| -> Result<UiConfirmedBlock> {
+                            if confirmed_block.block_time.is_none()
+                                || confirmed_block.block_height.is_none()
+                            {
+                                let r_bank_forks = self.bank_forks.read().unwrap();
+                                if let Some(bank) = r_bank_forks.get(slot) {
+                                    if confirmed_block.block_time.is_none() {
+                                        confirmed_block.block_time =
+                                            Some(bank.clock().unix_timestamp);
+                                    }
+                                    if confirmed_block.block_height.is_none() {
+                                        confirmed_block.block_height = Some(bank.block_height());
+                                    }
+                                }
+                            }
 
-        //                     Ok(confirmed_block
-        //                         .encode_with_options(encoding, encoding_options)
-        //                         .map_err(RpcCustomError::from)?)
-        //                 })
-        //                 .transpose();
-        //         }
-        //     }
-        // } else {
-        //     return Err(RpcCustomError::TransactionHistoryNotAvailable.into());
-        // }
+                            Ok(confirmed_block
+                                .encode_with_options(encoding, encoding_options)
+                                .map_err(RpcCustomError::from)?)
+                        })
+                        .transpose();
+                }
+            }
+        } else {
+            return Err(RpcCustomError::TransactionHistoryNotAvailable.into());
+        }
         Err(RpcCustomError::BlockNotAvailable { slot }.into())
     }
 
@@ -1160,131 +1160,135 @@ impl JsonRpcRequestProcessor {
         &self,
         slot: Slot,
         config: Option<RpcEncodingConfigWrapper<RpcBlockConfig>>,
-    ) -> Result<Option<BlockHeader>> {
-        info!("yup reaches here &&%% 1");
+    ) -> Result<BlockHeader> {
+        info!("yup reaches here &&%% 4444");
         const VOTE_PROGRAM_ID: &str = "Vote111111111111111111111111111111111111111";
-        // let block = self.get_block(slot, config).await;
-        let mut block_headers: Vec<BlockHeader> = Vec::new();
-        info!("yup reaches here &&%%");
-        return Ok(Some(BlockHeader {
-            validator_identity: Some(Pubkey::new_unique()),
-            validator_stake: Some(10),
-            vote_signature: Some("sigs".to_string()),
-        }));
+        let block = self.get_block(slot, config).await;
+        let mut block_header: BlockHeader = BlockHeader::default();
+        info!("block received {:?}", block);
+        // return Ok(BlockHeader {
+        //     validator_identity: vec![Some(Pubkey::new_unique())],
+        //     validator_stake: vec![Some(10)],
+        //     vote_signature: vec![Some("sigs".to_string())],
+        // });
 
-        // for outer_txn in block.unwrap().unwrap().transactions.unwrap() {
-        //     match outer_txn.transaction {
-        //         EncodedTransaction::Json(inner_txn) => {
-        //             match inner_txn.message {
-        //                 solana_transaction_status::UiMessage::Parsed(message) => {
-        //                     if message
-        //                         .account_keys
-        //                         .clone()
-        //                         .into_iter()
-        //                         .map(|key| key.pubkey)
-        //                         .collect_vec()
-        //                         .contains(&VOTE_PROGRAM_ID.to_string())
-        //                     {
-        //                         let mut header = BlockHeader {
-        //                             vote_signature: Some(inner_txn.signatures[0].clone()),
-        //                             validator_identity: None,
-        //                             validator_stake: None,
-        //                         };
-        //                         let ixdata = message.instructions[0].clone();
+        for outer_txn in block.unwrap().unwrap().transactions.unwrap() {
+            info!("check pt 1");
+            match outer_txn.transaction {
+                EncodedTransaction::Json(inner_txn) => {
+                    info!("check pt 2 new");
+                    match inner_txn.message {
+                        solana_transaction_status::UiMessage::Raw(message) => {
+                            let aks = message
+                                .account_keys
+                                .clone()
+                                .into_iter()
+                                .map(|key| key)
+                                .collect_vec();
+                            info!("accountks here {:?}", aks);
+                            if aks.contains(&VOTE_PROGRAM_ID.to_string()) {
+                                info!("check pt 3");
+                                let vote_signature = Some(inner_txn.signatures[0].clone());
+                                let validator_identity;
+                                let mut validator_stake = None;
 
-        //                         match ixdata {
-        //                             solana_transaction_status::UiInstruction::Compiled(ixdata) => {
-        //                                 let compiled_ix_data =
-        //                                     solana_sdk::instruction::CompiledInstruction::new(
-        //                                         ixdata.program_id_index.clone(),
-        //                                         &ixdata.clone(),
-        //                                         ixdata.accounts.clone(),
-        //                                     );
-        //                                 match compiled_ix_data {
-        //                                     compiled_ix_data => {
-        //                                         let ix =
-        //                                         solana_transaction_status::parse_vote::parse_vote(
-        //                                             &compiled_ix_data,
-        //                                             &AccountKeys::new(message.account_keys.clone().into_iter().map(|k| Pubkey::from_str(&k.pubkey.as_str()).unwrap()).collect::<Vec<Pubkey>>().as_ref(), None),
-        //                                         )
-        //                                         .unwrap();
-        //                                         let vote_state =
-        //                                             serde_json::from_value::<VoteState>(ix.info)
-        //                                                 .unwrap();
-        //                                         header.validator_identity =
-        //                                             Some(vote_state.node_pubkey);
-        //                                         let stake_account = self.get_account_info(
-        //                                             &Pubkey::from_str(
-        //                                                 message.account_keys[1].pubkey.as_str(),
-        //                                             )
-        //                                             .unwrap(),
-        //                                             None,
-        //                                         );
-        //                                         let stake_acc =
-        //                                             stake_account.unwrap().value.unwrap().data;
+                                let ixdata = message.instructions[0].clone();
 
-        //                                         match stake_acc.clone() {
-        //                                             UiAccountData::Json(stake_acc) => {
-        //                                                 let parsed = serde_json::from_value::<
-        //                                                     UiStakeAccount,
-        //                                                 >(
-        //                                                     stake_acc.parsed
-        //                                                 )
-        //                                                 .unwrap();
-        //                                                 // println!(
-        //                                                 //     "{:?}",
-        //                                                 //     parsed.stake.unwrap().delegation.stake
-        //                                                 // );
-        //                                                 header.validator_stake = Some(
-        //                                                     parsed
-        //                                                         .stake
-        //                                                         .unwrap()
-        //                                                         .delegation
-        //                                                         .stake
-        //                                                         .parse::<u64>()
-        //                                                         .unwrap(),
-        //                                                 );
-        //                                             }
-        //                                             _ => (),
-        //                                         };
+                                let compiled_ix_data =
+                                    solana_sdk::instruction::CompiledInstruction::new(
+                                        ixdata.program_id_index.clone(),
+                                        &ixdata.clone(),
+                                        ixdata.accounts.clone(),
+                                    );
+                                match compiled_ix_data {
+                                    compiled_ix_data => {
+                                        let ix = solana_transaction_status::parse_vote::parse_vote(
+                                            &compiled_ix_data,
+                                            &AccountKeys::new(
+                                                message
+                                                    .account_keys
+                                                    .clone()
+                                                    .into_iter()
+                                                    .map(|k| Pubkey::from_str(&k.as_str()).unwrap())
+                                                    .collect::<Vec<Pubkey>>()
+                                                    .as_ref(),
+                                                None,
+                                            ),
+                                        )
+                                        .unwrap();
+                                        let vote_state =
+                                            serde_json::from_value::<VoteState>(ix.info).unwrap();
+                                        validator_identity = Some(vote_state.node_pubkey);
+                                        let stake_account = self.get_account_info(
+                                            &Pubkey::from_str(message.account_keys[1].as_str())
+                                                .unwrap(),
+                                            None,
+                                        );
+                                        let stake_acc = stake_account.unwrap().value.unwrap().data;
 
-        //                                         // let node_balance_position = message
-        //                                         //     .account_keys
-        //                                         //     .into_iter()
-        //                                         //     .position(|k| {
-        //                                         //         k.pubkey
-        //                                         //             == vote_state.node_pubkey.to_string()
-        //                                         //     })
-        //                                         //     .unwrap();
+                                        match stake_acc.clone() {
+                                            UiAccountData::Json(stake_acc) => {
+                                                let parsed =
+                                                    serde_json::from_value::<UiStakeAccount>(
+                                                        stake_acc.parsed,
+                                                    )
+                                                    .unwrap();
+                                                // println!(
+                                                //     "{:?}",
+                                                //     parsed.stake.unwrap().delegation.stake
+                                                // );
+                                                validator_stake = Some(
+                                                    parsed
+                                                        .stake
+                                                        .unwrap()
+                                                        .delegation
+                                                        .stake
+                                                        .parse::<u64>()
+                                                        .unwrap(),
+                                                );
+                                            }
+                                            _ => (),
+                                        };
 
-        //                                         // let meta = outer_txn.meta.clone();
-        //                                         // header.validator_stake = Some(
-        //                                         //     meta.clone().unwrap().pre_balances
-        //                                         //         [node_balance_position]
-        //                                         //         - (meta.clone().unwrap().post_balances
-        //                                         //             [node_balance_position]
-        //                                         //             + meta.unwrap().fee),
-        //                                         // );
-        //                                         block_headers.push(header);
-        //                                         block_headers.push(BlockHeader {
-        //                                             vote_signature: None,
-        //                                             validator_identity: None,
-        //                                             validator_stake: Some(7),
-        //                                         });
-        //                                         info!("reaches here");
-        //                                     } // _ => (),
-        //                                 }
-        //                             }
-        //                             _ => (),
-        //                         }
-        //                     }
-        //                 }
-        //                 _ => (),
-        //             }
-        //         }
-        //         _ => (),
-        //     };
-        // }
+                                        // let node_balance_position = message
+                                        //     .account_keys
+                                        //     .into_iter()
+                                        //     .position(|k| {
+                                        //         k.pubkey
+                                        //             == vote_state.node_pubkey.to_string()
+                                        //     })
+                                        //     .unwrap();
+
+                                        // let meta = outer_txn.meta.clone();
+                                        // header.validator_stake = Some(
+                                        //     meta.clone().unwrap().pre_balances
+                                        //         [node_balance_position]
+                                        //         - (meta.clone().unwrap().post_balances
+                                        //             [node_balance_position]
+                                        //             + meta.unwrap().fee),
+                                        // );
+                                        block_header.validator_identity.push(validator_identity);
+                                        block_header.validator_stake.push(validator_stake);
+                                        block_header.vote_signature.push(vote_signature);
+                                        // block_headers.push(BlockHeader {
+                                        //     vote_signature: None,
+                                        //     validator_identity: None,
+                                        //     validator_stake: Some(7),
+                                        // });
+                                        // info!("reaches here");
+                                    } // _ => (),
+                                }
+                            }
+                        }
+                        _ => {
+                            info!("failing here 57864 {:?}", inner_txn.message);
+                        }
+                    }
+                }
+                _ => (),
+            };
+        }
+        Ok(block_header)
     }
 
     pub async fn get_blocks(
@@ -3475,7 +3479,7 @@ pub mod rpc_full {
             meta: Self::Metadata,
             slot: Slot,
             config: Option<RpcEncodingConfigWrapper<RpcBlockConfig>>,
-        ) -> BoxFuture<Result<Option<BlockHeader>>>;
+        ) -> BoxFuture<Result<BlockHeader>>;
 
         #[rpc(meta, name = "getBlockTime")]
         fn get_block_time(
@@ -3968,7 +3972,7 @@ pub mod rpc_full {
             meta: Self::Metadata,
             slot: Slot,
             config: Option<RpcEncodingConfigWrapper<RpcBlockConfig>>,
-        ) -> BoxFuture<Result<Option<BlockHeader>>> {
+        ) -> BoxFuture<Result<BlockHeader>> {
             debug!("get_block_headers rpc request received: {:?}", slot);
             Box::pin(async move { meta.get_block_headers(slot, config).await })
         }

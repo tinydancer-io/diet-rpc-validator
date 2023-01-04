@@ -755,9 +755,9 @@ pub struct UiConfirmedBlock {
 #[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct BlockHeader {
-    pub vote_signature: Option<String>,
-    pub validator_identity: Option<Pubkey>,
-    pub validator_stake: Option<u64>,
+    pub vote_signature: Vec<Option<String>>,
+    pub validator_identity: Vec<Option<Pubkey>>,
+    pub validator_stake: Vec<Option<u64>>,
 }
 
 #[derive(Clone, Debug, PartialEq)]
