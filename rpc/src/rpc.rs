@@ -1,16 +1,20 @@
 //! The `rpc` module implements the Solana RPC interface.
 
 use itertools::Itertools;
+use serde::Serialize;
 use solana_account_decoder::{
     parse_stake::UiStakeAccount,
     parse_vote::{UiVoteState, VoteAccountType},
     UiAccountData,
 };
-use solana_sdk::message::AccountKeys;
+use solana_runtime::vote_parser::ParsedVote;
+use solana_sdk::{instruction::CompiledInstruction, message::AccountKeys};
 use solana_transaction_status::{
-    BlockHeader, EncodedTransaction, UiCompiledInstruction, UiParsedInstruction,
-    UiPartiallyDecodedInstruction, UiTransaction,
+    parse_instruction::ParsedInstructionEnum, BlockHeader, EncodedTransaction,
+    UiCompiledInstruction, UiInstruction, UiParsedInstruction, UiPartiallyDecodedInstruction,
+    UiTransaction,
 };
+use solana_vote_program::vote_instruction::VoteInstruction;
 
 use {
     crate::{
@@ -1176,14 +1180,14 @@ impl JsonRpcRequestProcessor {
             info!("check pt 1");
             match outer_txn.transaction {
                 EncodedTransaction::Json(inner_txn) => {
-                    info!("check pt 2 new");
+                    info!("check pt 2 new {:?}", inner_txn.message);
                     match inner_txn.message {
-                        solana_transaction_status::UiMessage::Raw(message) => {
+                        solana_transaction_status::UiMessage::Parsed(message) => {
                             let aks = message
                                 .account_keys
                                 .clone()
                                 .into_iter()
-                                .map(|key| key)
+                                .map(|key| key.pubkey)
                                 .collect_vec();
                             info!("accountks here {:?}", aks);
                             if aks.contains(&VOTE_PROGRAM_ID.to_string()) {
@@ -1193,39 +1197,55 @@ impl JsonRpcRequestProcessor {
                                 let mut validator_stake = None;
 
                                 let ixdata = message.instructions[0].clone();
-
-                                let compiled_ix_data =
-                                    solana_sdk::instruction::CompiledInstruction::new(
-                                        ixdata.program_id_index.clone(),
-                                        &ixdata.clone(),
-                                        ixdata.accounts.clone(),
-                                    );
-                                match compiled_ix_data {
-                                    compiled_ix_data => {
-                                        let ix = solana_transaction_status::parse_vote::parse_vote(
-                                            &compiled_ix_data,
-                                            &AccountKeys::new(
-                                                message
-                                                    .account_keys
-                                                    .clone()
-                                                    .into_iter()
-                                                    .map(|k| Pubkey::from_str(&k.as_str()).unwrap())
-                                                    .collect::<Vec<Pubkey>>()
-                                                    .as_ref(),
-                                                None,
-                                            ),
-                                        )
-                                        .unwrap();
-                                        let vote_state =
-                                            serde_json::from_value::<VoteState>(ix.info).unwrap();
-                                        validator_identity = Some(vote_state.node_pubkey);
+                                info!("LOL {:?} | {:?}", &ixdata, message.instructions);
+                                // let compiled_ix_data =
+                                //     solana_sdk::instruction::CompiledInstruction::new(
+                                //         ixdata..program_id_index.clone(),
+                                //         &ixdata.data.clone(),
+                                //         ixdata.accounts.clone(),
+                                //     );
+                                // info!(
+                                //     "HAHAHA {:?} | {:?}",
+                                //     &compiled_ix_data, message.account_keys
+                                // );
+                                // let new = VoteInstruction::Vote(())
+                                match ixdata {
+                                    UiInstruction::Parsed(ixc) => {
+                                        let static_keys = message
+                                            .account_keys
+                                            .clone()
+                                            .into_iter()
+                                            .map(|k| Pubkey::from_str(&k.pubkey.as_str()).unwrap())
+                                            .collect::<Vec<Pubkey>>();
+                                        info!("statickeys: {:?}", static_keys);
+                                        let acc_keys = AccountKeys::new(&static_keys, None);
+                                        info!("acc keys qty {:?}", acc_keys.len(),);
+                                        // let ci = CompiledInstruction::new(
+                                        //     ixc.program_id_index.clone(),
+                                        //     &ixc.data.clone(),
+                                        //     ixc.accounts.clone(),
+                                        // );
+                                        // let pv = bincode::deserialize(&ixdata..as_bytes());
+                                        // let pv = solana_transaction_status::parse_vote::parse_vote(
+                                        //     &ci, &acc_keys,
+                                        // );
+                                        // info!("pv logged {:?}", pv);
+                                        // let ix: ParsedInstructionEnum = pv.unwrap();
+                                        info!("KEM CHHO PARIK{:?}", &ixc);
+                                        // let vote_state = parse_vote_instruction_data()
+                                        validator_identity =
+                                            Some(message.account_keys.get(0).unwrap());
+                                        info!("validen");
                                         let stake_account = self.get_account_info(
-                                            &Pubkey::from_str(message.account_keys[1].as_str())
-                                                .unwrap(),
+                                            &Pubkey::from_str(
+                                                message.account_keys[1].pubkey.as_str(),
+                                            )
+                                            .unwrap(),
                                             None,
                                         );
+                                        info!("stakeacc {:?}", stake_account);
                                         let stake_acc = stake_account.unwrap().value.unwrap().data;
-
+                                        info!("stakeaccun {:?}", stake_acc);
                                         match stake_acc.clone() {
                                             UiAccountData::Json(stake_acc) => {
                                                 let parsed =
@@ -1247,7 +1267,7 @@ impl JsonRpcRequestProcessor {
                                                         .unwrap(),
                                                 );
                                             }
-                                            _ => (),
+                                            _ => info!("REACHED HERE!"),
                                         };
 
                                         // let node_balance_position = message
@@ -1267,7 +1287,12 @@ impl JsonRpcRequestProcessor {
                                         //             [node_balance_position]
                                         //             + meta.unwrap().fee),
                                         // );
-                                        block_header.validator_identity.push(validator_identity);
+                                        block_header.validator_identity.push(Some(
+                                            Pubkey::from_str(
+                                                validator_identity.unwrap().pubkey.as_str(),
+                                            )
+                                            .unwrap(),
+                                        ));
                                         block_header.validator_stake.push(validator_stake);
                                         block_header.vote_signature.push(vote_signature);
                                         // block_headers.push(BlockHeader {
@@ -1276,7 +1301,8 @@ impl JsonRpcRequestProcessor {
                                         //     validator_stake: Some(7),
                                         // });
                                         // info!("reaches here");
-                                    } // _ => (),
+                                    }
+                                    _ => (),
                                 }
                             }
                         }

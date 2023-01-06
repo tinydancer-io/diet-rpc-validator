@@ -246,6 +246,8 @@ fn check_num_vote_accounts(accounts: &[u8], num: usize) -> Result<(), ParseInstr
 
 #[cfg(test)]
 mod test {
+    use std::io::Read;
+
     use {
         super::*,
         solana_sdk::{
@@ -451,6 +453,26 @@ mod test {
         let authorized_voter_pubkey = Pubkey::new_unique();
         let instruction = vote_instruction::vote(&vote_pubkey, &authorized_voter_pubkey, vote);
         let mut message = Message::new(&[instruction], None);
+        let cix = CompiledInstruction {
+            program_id_index: 2,
+            accounts: vec![1, 1],
+            data: vec![
+                2, 2, 0, 0, 0, 0, 0, 0, 0, 1, 1, 158, 0, 0, 0, 0, 0, 0, 0, 70, 107, 54, 51, 80, 84,
+                51, 121, 77, 82, 66, 105, 65, 70, 105, 76, 68, 102, 72, 107, 102, 51, 74, 100, 76,
+                103, 103, 53, 53, 119, 117, 77, 78, 71, 87, 118, 102, 75, 121, 57, 113, 80, 81, 50,
+                49, 53, 115, 67, 71, 102, 84, 70, 121, 88, 105, 112, 98, 52, 101, 119, 117, 80, 80,
+                98, 72, 57, 49, 52, 53, 50, 112, 103, 76, 122, 106, 56, 103, 50, 85, 57, 78, 109,
+                85, 106, 112, 77, 77, 69, 53, 101, 51, 90, 57, 75, 85, 80, 74, 49, 80, 88, 87, 120,
+                74, 55, 111, 70, 113, 110, 86, 87, 85, 89, 77, 114, 56, 121, 57, 114, 49, 68, 103,
+                49, 109, 119, 67, 68, 89, 88, 56, 119, 68, 122, 68, 98, 118, 81, 117, 72, 67, 119,
+                110, 53, 114, 110, 99, 111, 56, 117, 74, 117, 110, 56, 55, 65, 109, 122, 67, 70, 0,
+            ],
+        };
+        let serialize = bincode::serialize::<Vec<u8>>(&cix.data).unwrap(); //@note
+        println!("serialized: {:?}", serialize);
+        let deser: VoteInstruction = bincode::deserialize(&serialize).unwrap();
+        println!("deserialized: {:?}", deser);
+        println!("the ix: {:?} | {:?}", message.instructions[0], cix);
         assert_eq!(
             parse_vote(
                 &message.instructions[0],
