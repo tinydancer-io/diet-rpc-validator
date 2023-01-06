@@ -414,16 +414,19 @@ impl JsonRpcRequestProcessor {
         pubkey: &Pubkey,
         config: Option<RpcAccountInfoConfig>,
     ) -> Result<RpcResponse<Option<UiAccount>>> {
+        // All of the below values are None because we're passing None where this fn is called.
         let RpcAccountInfoConfig {
             encoding,
             data_slice,
             commitment,
             min_context_slot,
         } = config.unwrap_or_default();
+        // returns a finalized Bank in our case as Default value of commitment is Finalized.
         let bank = self.get_bank_with_config(RpcContextConfig {
             commitment,
-            min_context_slot,
+            min_context_slot, // <= A None being passed here
         })?;
+        // encoding sets to Binary here as "encoding" itself is None.
         let encoding = encoding.unwrap_or(UiAccountEncoding::Binary);
 
         let response = get_encoded_account(&bank, pubkey, encoding, data_slice)?;
@@ -1241,10 +1244,14 @@ impl JsonRpcRequestProcessor {
                                                 message.account_keys[1].pubkey.as_str(),
                                             )
                                             .unwrap(),
-                                            None,
+                                            Some(RpcAccountInfoConfig { encoding: Some(UiAccountEncoding::Base64), data_slice: None, commitment: None, min_context_slot: Some(19400)}), // Seems like we have to pass a config here instead of a None
                                         );
+                                        // Error is returned here:==> stakeacc Err(Error { code: InvalidRequest, message: "Encoded binary (base 58) data should be less than 128 bytes, please use Base64 encoding.", data: None })
+                                        // Documenting this in case I wake up late tomorrow so hasubhai can see it.
+                                        // Passing the Base64 config works ig?
                                         info!("stakeacc {:?}", stake_account);
-                                        let stake_acc = stake_account.unwrap().value.unwrap().data;
+                                        let stake_acc =                                        
+                                        stake_account.unwrap().value.unwrap().data;
                                         info!("stakeaccun {:?}", stake_acc);
                                         match stake_acc.clone() {
                                             UiAccountData::Json(stake_acc) => {
@@ -2464,7 +2471,7 @@ fn get_encoded_account(
         None => Ok(None),
     }
 }
-
+/// THE ERROR MESSAGE IS RETURNED FROM THIS FUNCTION BELOW SINCE IN OUR CASE ENCODING WAS "Binary"
 fn encode_account<T: ReadableAccount>(
     account: &T,
     pubkey: &Pubkey,
