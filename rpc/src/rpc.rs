@@ -3,11 +3,11 @@
 use itertools::Itertools;
 use serde::Serialize;
 use solana_account_decoder::{
-    parse_stake::UiStakeAccount,
+    parse_stake::{StakeAccountType, UiStakeAccount},
     parse_vote::{UiVoteState, VoteAccountType},
     UiAccountData,
 };
-use solana_runtime::vote_parser::ParsedVote;
+use solana_runtime::{account_info::AccountInfo, vote_parser::ParsedVote};
 use solana_sdk::{instruction::CompiledInstruction, message::AccountKeys};
 use solana_transaction_status::{
     parse_instruction::ParsedInstructionEnum, BlockHeader, EncodedTransaction,
@@ -1173,11 +1173,6 @@ impl JsonRpcRequestProcessor {
         let block = self.get_block(slot, config).await;
         let mut block_header: BlockHeader = BlockHeader::default();
         info!("block received {:?}", block);
-        // return Ok(BlockHeader {
-        //     validator_identity: vec![Some(Pubkey::new_unique())],
-        //     validator_stake: vec![Some(10)],
-        //     vote_signature: vec![Some("sigs".to_string())],
-        // });
 
         for outer_txn in block.unwrap().unwrap().transactions.unwrap() {
             info!("check pt 1");
@@ -1244,15 +1239,65 @@ impl JsonRpcRequestProcessor {
                                                 message.account_keys[1].pubkey.as_str(),
                                             )
                                             .unwrap(),
-                                            Some(RpcAccountInfoConfig { encoding: Some(UiAccountEncoding::Base64), data_slice: None, commitment: None, min_context_slot: Some(19400)}), // Seems like we have to pass a config here instead of a None
+                                            Some(RpcAccountInfoConfig {
+                                                encoding: Some(UiAccountEncoding::JsonParsed),
+                                                data_slice: None,
+                                                commitment: None,
+                                                min_context_slot: Some(1),
+                                            }), // Seems like we have to pass a config here instead of a None
                                         );
                                         // Error is returned here:==> stakeacc Err(Error { code: InvalidRequest, message: "Encoded binary (base 58) data should be less than 128 bytes, please use Base64 encoding.", data: None })
-                                        // Documenting this in case I wake up late tomorrow so hasubhai can see it.
                                         // Passing the Base64 config works ig?
                                         info!("stakeacc {:?}", stake_account);
-                                        let stake_acc =                                        
-                                        stake_account.unwrap().value.unwrap().data;
+                                        let stake_acc = stake_account.unwrap().value.unwrap().data;
                                         info!("stakeaccun {:?}", stake_acc);
+                                        let get_all_stake_accs = self.get_program_accounts(
+                                            &Pubkey::from_str(
+                                                &"Stake11111111111111111111111111111111111111",
+                                            )
+                                            .unwrap(),
+                                            Some(RpcAccountInfoConfig {
+                                                encoding: Some(UiAccountEncoding::JsonParsed),
+                                                data_slice: None,
+                                                commitment: None,
+                                                min_context_slot: Some(1),
+                                            }),
+                                            vec![],
+                                            false,
+                                        );
+                                        let stakes = get_all_stake_accs.unwrap();
+                                        info!("hasu1");
+                                        if let OptionalContext::NoContext(stks) = stakes {
+                                            info!("hasu2");
+                                            for stk in stks {
+                                                info!("hasu3");
+                                                if let UiAccountData::Json(stka) = stk.account.data
+                                                {
+                                                    info!("hasu4 {:?}", stka.parsed);
+                                                    let p: solana_account_decoder::parse_stake::StakeAccountType =
+                                                        serde_json::from_value(stka.parsed)
+                                                            .unwrap();
+                                                    info!("pstakestate {:?}", p);
+                                                    match p {
+                                                        StakeAccountType::Delegated(dps) => {
+                                                            validator_stake = Some(
+                                                                dps.stake
+                                                                    .unwrap()
+                                                                    .delegation
+                                                                    .stake
+                                                                    .parse::<u64>()
+                                                                    .unwrap(),
+                                                            )
+                                                        }
+                                                        StakeAccountType::Initialized(ips) => {}
+                                                        _ => {
+                                                            info!("some other fucking type");
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                        // info!("allstake {:?}", get_all_stake_accs);
                                         match stake_acc.clone() {
                                             UiAccountData::Json(stake_acc) => {
                                                 let parsed =
