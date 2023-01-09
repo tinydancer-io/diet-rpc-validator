@@ -55,7 +55,7 @@ pub mod repair_weight;
 pub mod repair_weighted_traversal;
 pub mod replay_stage;
 pub mod request_response;
-mod result;
+pub mod result;
 pub mod retransmit_stage;
 pub mod rewards_recorder_service;
 pub mod sample_performance_service;

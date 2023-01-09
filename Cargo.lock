@@ -4543,6 +4543,24 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "43b2853a4d09f215c24cc5489c992ce46052d359b5109343cbafbf26bc62f8a3"
 
 [[package]]
+name = "shred-sample"
+version = "0.1.0"
+dependencies = [
+ "crossbeam-channel",
+ "log",
+ "serde",
+ "serde_derive",
+ "solana-core",
+ "solana-gossip",
+ "solana-ledger",
+ "solana-logger 1.15.0",
+ "solana-perf",
+ "solana-sdk 1.15.0",
+ "solana-streamer",
+ "tokio",
+]
+
+[[package]]
 name = "signal-hook"
 version = "0.3.14"
 source = "registry+https://github.com/rust-lang/crates.io-index"
