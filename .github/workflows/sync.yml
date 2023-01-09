@@ -3,7 +3,7 @@ name: Sync Fork
 on:
   schedule:
     - cron: '*/5 * * * *' # runs every 5 minutes
-  workflow_dispatch:
+  workflow_dispatch: # check if update works
 
 jobs:
   sync:
