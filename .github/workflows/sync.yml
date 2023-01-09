@@ -1,7 +1,7 @@
 name: Sync Fork
 
 on:
-  workflow_dispatch: # check if update works, does it work now
+  workflow_dispatch: # this definetly works
 
 jobs:
   sync:
