@@ -474,7 +474,7 @@ impl BroadcastRun for StandardBroadcastRun {
 }
 
 fn should_use_merkle_variant(_slot: Slot, _cluster_type: ClusterType, _shred_version: u16) -> bool {
-    false
+    true
 }
 
 #[cfg(test)]
