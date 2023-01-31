@@ -9,7 +9,7 @@
 [![Build status](https://badge.buildkite.com/8cc350de251d61483db98bdfc895b9ea0ac8ffa4a32ee850ed.svg?branch=master)](https://buildkite.com/solana-labs/solana/builds?branch=master)
 [![codecov](https://codecov.io/gh/solana-labs/solana/branch/master/graph/badge.svg)](https://codecov.io/gh/solana-labs/solana)
 
-# Diet client specific changes
+# Diet client specific Changes
 Added two methods for our stage-1 in the ```diet-rpc-validator/rpc.rs```
 
 #### Block Header type
@@ -38,6 +38,13 @@ Returns the requested shreds upon call filtered by the slot number and indices
  + Slot
  + Shred Indices
  
+Request:
+```sh
+curl http://localhost:8899 -X POST -H "Content-Type: application/json" -d '
+  {"jsonrpc": "2.0","id":1,"method":"getShreds","params":[1,[0,1,2] ]}
+'
+```
+
  Output:
  + ```Vec<Option<Shred>>```
  
