@@ -1172,197 +1172,127 @@ impl JsonRpcRequestProcessor {
         const VOTE_PROGRAM_ID: &str = "Vote111111111111111111111111111111111111111";
         let block = self.get_block(slot, config).await;
         let mut block_header: BlockHeader = BlockHeader::default();
-        info!("block received {:?}", block);
 
         for outer_txn in block.unwrap().unwrap().transactions.unwrap() {
-            info!("check pt 1");
             match outer_txn.transaction {
-                EncodedTransaction::Json(inner_txn) => {
-                    info!("check pt 2 new {:?}", inner_txn.message);
-                    match inner_txn.message {
-                        solana_transaction_status::UiMessage::Parsed(message) => {
-                            let aks = message
-                                .account_keys
-                                .clone()
-                                .into_iter()
-                                .map(|key| key.pubkey)
-                                .collect_vec();
-                            info!("accountks here {:?}", aks);
-                            if aks.contains(&VOTE_PROGRAM_ID.to_string()) {
-                                info!("check pt 3");
-                                let vote_signature = Some(inner_txn.signatures[0].clone());
-                                let validator_identity;
-                                let mut validator_stake = None;
+                EncodedTransaction::Json(inner_txn) => match inner_txn.message {
+                    solana_transaction_status::UiMessage::Parsed(message) => {
+                        let aks = message
+                            .account_keys
+                            .clone()
+                            .into_iter()
+                            .map(|key| key.pubkey)
+                            .collect_vec();
 
-                                let ixdata = message.instructions[0].clone();
-                                info!("LOL {:?} | {:?}", &ixdata, message.instructions);
-                                // let compiled_ix_data =
-                                //     solana_sdk::instruction::CompiledInstruction::new(
-                                //         ixdata..program_id_index.clone(),
-                                //         &ixdata.data.clone(),
-                                //         ixdata.accounts.clone(),
-                                //     );
-                                // info!(
-                                //     "HAHAHA {:?} | {:?}",
-                                //     &compiled_ix_data, message.account_keys
-                                // );
-                                // let new = VoteInstruction::Vote(())
-                                match ixdata {
-                                    UiInstruction::Parsed(ixc) => {
-                                        let static_keys = message
-                                            .account_keys
-                                            .clone()
-                                            .into_iter()
-                                            .map(|k| Pubkey::from_str(&k.pubkey.as_str()).unwrap())
-                                            .collect::<Vec<Pubkey>>();
-                                        info!("statickeys: {:?}", static_keys);
-                                        let acc_keys = AccountKeys::new(&static_keys, None);
-                                        info!("acc keys qty {:?}", acc_keys.len(),);
-                                        // let ci = CompiledInstruction::new(
-                                        //     ixc.program_id_index.clone(),
-                                        //     &ixc.data.clone(),
-                                        //     ixc.accounts.clone(),
-                                        // );
-                                        // let pv = bincode::deserialize(&ixdata..as_bytes());
-                                        // let pv = solana_transaction_status::parse_vote::parse_vote(
-                                        //     &ci, &acc_keys,
-                                        // );
-                                        // info!("pv logged {:?}", pv);
-                                        // let ix: ParsedInstructionEnum = pv.unwrap();
-                                        info!("KEM CHHO PARIK{:?}", &ixc);
-                                        // let vote_state = parse_vote_instruction_data()
-                                        validator_identity =
-                                            Some(message.account_keys.get(0).unwrap());
-                                        info!("validen");
-                                        let stake_account = self.get_account_info(
-                                            &Pubkey::from_str(
-                                                message.account_keys[1].pubkey.as_str(),
-                                            )
+                        if aks.contains(&VOTE_PROGRAM_ID.to_string()) {
+                            let vote_signature = Some(inner_txn.signatures[0].clone());
+                            let validator_identity;
+                            let mut validator_stake = None;
+
+                            let ixdata = message.instructions[0].clone();
+
+                            match ixdata {
+                                UiInstruction::Parsed(ixc) => {
+                                    let static_keys = message
+                                        .account_keys
+                                        .clone()
+                                        .into_iter()
+                                        .map(|k| Pubkey::from_str(&k.pubkey.as_str()).unwrap())
+                                        .collect::<Vec<Pubkey>>();
+
+                                    let acc_keys = AccountKeys::new(&static_keys, None);
+
+                                    validator_identity = Some(message.account_keys.get(0).unwrap());
+                                    info!("validen");
+                                    let stake_account = self.get_account_info(
+                                        &Pubkey::from_str(message.account_keys[1].pubkey.as_str())
                                             .unwrap(),
-                                            Some(RpcAccountInfoConfig {
-                                                encoding: Some(UiAccountEncoding::JsonParsed),
-                                                data_slice: None,
-                                                commitment: None,
-                                                min_context_slot: Some(1),
-                                            }), // Seems like we have to pass a config here instead of a None
-                                        );
-                                        // Error is returned here:==> stakeacc Err(Error { code: InvalidRequest, message: "Encoded binary (base 58) data should be less than 128 bytes, please use Base64 encoding.", data: None })
-                                        // Passing the Base64 config works ig?
-                                        info!("stakeacc {:?}", stake_account);
-                                        let stake_acc = stake_account.unwrap().value.unwrap().data;
-                                        info!("stakeaccun {:?}", stake_acc);
-                                        let get_all_stake_accs = self.get_program_accounts(
-                                            &Pubkey::from_str(
-                                                &"Stake11111111111111111111111111111111111111",
-                                            )
-                                            .unwrap(),
-                                            Some(RpcAccountInfoConfig {
-                                                encoding: Some(UiAccountEncoding::JsonParsed),
-                                                data_slice: None,
-                                                commitment: None,
-                                                min_context_slot: Some(1),
-                                            }),
-                                            vec![],
-                                            false,
-                                        );
-                                        let stakes = get_all_stake_accs.unwrap();
-                                        info!("hasu1");
-                                        if let OptionalContext::NoContext(stks) = stakes {
-                                            info!("hasu2");
-                                            for stk in stks {
-                                                info!("hasu3");
-                                                if let UiAccountData::Json(stka) = stk.account.data
-                                                {
-                                                    info!("hasu4 {:?}", stka.parsed);
-                                                    let p: solana_account_decoder::parse_stake::StakeAccountType =
+                                        Some(RpcAccountInfoConfig {
+                                            encoding: Some(UiAccountEncoding::JsonParsed),
+                                            data_slice: None,
+                                            commitment: None,
+                                            min_context_slot: Some(1),
+                                        }),
+                                    );
+
+                                    let stake_acc = stake_account.unwrap().value.unwrap().data;
+
+                                    let get_all_stake_accs = self.get_program_accounts(
+                                        &Pubkey::from_str(
+                                            &"Stake11111111111111111111111111111111111111",
+                                        )
+                                        .unwrap(),
+                                        Some(RpcAccountInfoConfig {
+                                            encoding: Some(UiAccountEncoding::JsonParsed),
+                                            data_slice: None,
+                                            commitment: None,
+                                            min_context_slot: Some(1),
+                                        }),
+                                        vec![],
+                                        false,
+                                    );
+                                    let stakes = get_all_stake_accs.unwrap();
+
+                                    if let OptionalContext::NoContext(stks) = stakes {
+                                        for stk in stks {
+                                            if let UiAccountData::Json(stka) = stk.account.data {
+                                                let p: solana_account_decoder::parse_stake::StakeAccountType =
                                                         serde_json::from_value(stka.parsed)
                                                             .unwrap();
-                                                    info!("pstakestate {:?}", p);
-                                                    match p {
-                                                        StakeAccountType::Delegated(dps) => {
-                                                            validator_stake = Some(
-                                                                dps.stake
-                                                                    .unwrap()
-                                                                    .delegation
-                                                                    .stake
-                                                                    .parse::<u64>()
-                                                                    .unwrap(),
-                                                            )
-                                                        }
-                                                        StakeAccountType::Initialized(ips) => {}
-                                                        _ => {
-                                                            info!("some other fucking type");
-                                                        }
+
+                                                match p {
+                                                    StakeAccountType::Delegated(dps) => {
+                                                        validator_stake = Some(
+                                                            dps.stake
+                                                                .unwrap()
+                                                                .delegation
+                                                                .stake
+                                                                .parse::<u64>()
+                                                                .unwrap(),
+                                                        )
                                                     }
+                                                    StakeAccountType::Initialized(ips) => {}
+                                                    _ => {}
                                                 }
                                             }
                                         }
-                                        // info!("allstake {:?}", get_all_stake_accs);
-                                        match stake_acc.clone() {
-                                            UiAccountData::Json(stake_acc) => {
-                                                let parsed =
-                                                    serde_json::from_value::<UiStakeAccount>(
-                                                        stake_acc.parsed,
-                                                    )
-                                                    .unwrap();
-                                                // println!(
-                                                //     "{:?}",
-                                                //     parsed.stake.unwrap().delegation.stake
-                                                // );
-                                                validator_stake = Some(
-                                                    parsed
-                                                        .stake
-                                                        .unwrap()
-                                                        .delegation
-                                                        .stake
-                                                        .parse::<u64>()
-                                                        .unwrap(),
-                                                );
-                                            }
-                                            _ => info!("REACHED HERE!"),
-                                        };
-
-                                        // let node_balance_position = message
-                                        //     .account_keys
-                                        //     .into_iter()
-                                        //     .position(|k| {
-                                        //         k.pubkey
-                                        //             == vote_state.node_pubkey.to_string()
-                                        //     })
-                                        //     .unwrap();
-
-                                        // let meta = outer_txn.meta.clone();
-                                        // header.validator_stake = Some(
-                                        //     meta.clone().unwrap().pre_balances
-                                        //         [node_balance_position]
-                                        //         - (meta.clone().unwrap().post_balances
-                                        //             [node_balance_position]
-                                        //             + meta.unwrap().fee),
-                                        // );
-                                        block_header.validator_identity.push(Some(
-                                            Pubkey::from_str(
-                                                validator_identity.unwrap().pubkey.as_str(),
-                                            )
-                                            .unwrap(),
-                                        ));
-                                        block_header.validator_stake.push(validator_stake);
-                                        block_header.vote_signature.push(vote_signature);
-                                        // block_headers.push(BlockHeader {
-                                        //     vote_signature: None,
-                                        //     validator_identity: None,
-                                        //     validator_stake: Some(7),
-                                        // });
-                                        // info!("reaches here");
                                     }
-                                    _ => (),
+
+                                    match stake_acc.clone() {
+                                        UiAccountData::Json(stake_acc) => {
+                                            let parsed = serde_json::from_value::<UiStakeAccount>(
+                                                stake_acc.parsed,
+                                            )
+                                            .unwrap();
+
+                                            validator_stake = Some(
+                                                parsed
+                                                    .stake
+                                                    .unwrap()
+                                                    .delegation
+                                                    .stake
+                                                    .parse::<u64>()
+                                                    .unwrap(),
+                                            );
+                                        }
+                                        _ => {}
+                                    };
+
+                                    block_header.validator_identity.push(Some(
+                                        Pubkey::from_str(
+                                            validator_identity.unwrap().pubkey.as_str(),
+                                        )
+                                        .unwrap(),
+                                    ));
+                                    block_header.validator_stake.push(validator_stake);
+                                    block_header.vote_signature.push(vote_signature);
                                 }
+                                _ => (),
                             }
                         }
-                        _ => {
-                            info!("failing here 57864 {:?}", inner_txn.message);
-                        }
                     }
-                }
+                    _ => {}
+                },
                 _ => (),
             };
         }
