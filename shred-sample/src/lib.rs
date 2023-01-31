@@ -3,27 +3,47 @@
 //! join - join the thread
 
 use std::{
-    net::UdpSocket,
+    cmp::Reverse,
+    net::{SocketAddr, UdpSocket},
     sync::{
         atomic::{AtomicBool, Ordering},
-        Arc,
+        Arc, RwLock,
     },
-    thread::{self, JoinHandle}, time::{Duration, Instant},
+    thread::{self, Builder, JoinHandle},
+    time::{Duration, Instant},
 };
-// use solana_logger::
+
 use crossbeam_channel::unbounded;
 use log::{info, trace};
-use solana_core::result::{self, Error};
-use solana_sdk::{clock::Slot, hash::{Hash, HASH_BYTES}, signature::SIGNATURE_BYTES, pubkey::PUBKEY_BYTES};
+use solana_core::{
+    repair_service::REPAIR_MS,
+    result::{self, Error, Result},
+};
+use solana_gossip::{
+    cluster_info::ClusterInfo,
+    contact_info::ContactInfo,
+    ping_pong::{self, Ping, PingCache},
+};
 use solana_ledger::{blockstore::Blockstore, shred::SIZE_OF_NONCE};
-use solana_perf::{recycler::Recycler, packet::PACKET_DATA_SIZE};
+use solana_perf::{
+    data_budget::DataBudget,
+    packet::{PacketBatchRecycler, PACKET_DATA_SIZE},
+    recycler::Recycler,
+};
+use solana_runtime::bank_forks::BankForks;
+use solana_sdk::{
+    clock::Slot,
+    genesis_config::ClusterType,
+    hash::{Hash, HASH_BYTES},
+    pubkey::{Pubkey, PUBKEY_BYTES},
+    signature::{Keypair, SIGNATURE_BYTES},
+    signer::Signer,
+};
 use solana_streamer::{
     packet::PacketBatch,
     socket::SocketAddrSpace,
-    streamer::{self, StreamerReceiveStats},
+    streamer::{self, PacketBatchReceiver, PacketBatchSender, StreamerReceiveStats},
 };
-use solana_gossip::{ping_pong, contact_info::ContactInfo};
-
 type SlotHash = (Slot, Hash);
 // the number of slots to respond with when responding to `Orphan` requests
 pub const MAX_ORPHAN_REPAIR_RESPONSES: usize = 11;
@@ -46,18 +66,159 @@ const REPAIR_PING_CACHE_RATE_LIMIT_DELAY: Duration = Duration::from_secs(2);
 pub(crate) const REPAIR_RESPONSE_SERIALIZED_PING_BYTES: usize =
     4 /*enum discriminator*/ + PUBKEY_BYTES + REPAIR_PING_TOKEN_SIZE + SIGNATURE_BYTES;
 const SIGNED_REPAIR_TIME_WINDOW: Duration = Duration::from_secs(60 * 10); // 10 min
-use serde_derive::{Serialize, Deserialize};
+use serde_derive::{Deserialize, Serialize};
 pub(crate) struct ShredSampleService {
     thread_hdls: Vec<JoinHandle<()>>,
 }
 
-pub struct ServeSamples {}
+#[derive(Default)]
+struct ServeSamplesStats {
+    total_requests: usize,
+    unsigned_requests: usize,
+    dropped_requests_outbound_bandwidth: usize,
+    dropped_requests_load_shed: usize,
+    dropped_requests_low_stake: usize,
+    whitelisted_requests: usize,
+    total_dropped_response_packets: usize,
+    total_response_packets: usize,
+    total_response_bytes_staked: usize,
+    total_response_bytes_unstaked: usize,
+    handle_requests_staked: usize,
+    handle_requests_unstaked: usize,
+    processed: usize,
+    self_repair: usize,
+    window_index: usize,
+    highest_window_index: usize,
+    orphan: usize,
+    pong: usize,
+    ancestor_hashes: usize,
+    ping_cache_check_failed: usize,
+    pings_sent: usize,
+    decode_time_us: u64,
+    err_time_skew: usize,
+    err_malformed: usize,
+    err_sig_verify: usize,
+    err_unsigned: usize,
+    err_id_mismatch: usize,
+}
+
+struct SampleRequestWithMeta {
+    request: SampleProtocol,
+    from_addr: SocketAddr,
+    // stake: u64,
+    // whitelisted: bool, // @TODO
+}
+pub struct ServeSamples {
+    cluster_info: Arc<ClusterInfo>,
+    bank_forks: Arc<RwLock<BankForks>>,
+    // sample_whitelist: Arc<RwLock<HashSet<Pubkey>>>, //@TODO whitelist when we add the crds
+}
+
 #[derive(Serialize, Deserialize, Debug)]
-pub enum SampleProtocol{
-    RandomSamplesForSlot(Slot,u64),
+pub enum SampleProtocol {
+    RandomSamplesForSlot(ContactInfo, Slot, u64, Vec<u8>),
     Pong(ping_pong::Pong),
 }
+impl SampleProtocol {
+    fn supports_signature(&self) -> bool {
+        match self {
+            Self::RandomSamplesForSlot(_, _, _, _) => false,
+            Self::Pong(_) => true,
+        }
+    }
+    fn sender(&self) -> &Pubkey {
+        match self {
+            Self::RandomSamplesForSlot(ci, _, _, _) => &ci.id,
+            Self::Pong(pong) => pong.from(),
+        }
+    }
+}
 impl ServeSamples {
+    fn handle_packets(
+        &self,
+        ping_cache: &mut PingCache,
+        recycler: &PacketBatchRecycler,
+        blockstore: &Blockstore,
+        requests: Vec<SampleRequestWithMeta>,
+        response_sender: &PacketBatchSender,
+        stats: &mut ServeSamplesStats,
+        data_budget: &DataBudget,
+    ) {
+        let identity_keypair = self.cluster_info.keypair().clone();
+        let mut pending_pings = Vec::default();
+
+        let requests_len = requests.len();
+        for (
+            i,
+            SampleRequestWithMeta {
+                request,
+                from_addr,
+                // stake,
+                // ..
+            },
+        ) in requests.into_iter().enumerate()
+        {
+            if !matches!(&request, SampleProtocol::Pong(_)) {
+                let (check, ping_pkt) =
+                    Self::check_ping_cache(ping_cache, &request, &from_addr, &identity_keypair);
+                if let Some(ping_pkt) = ping_pkt {
+                    pending_pings.push(ping_pkt);
+                }
+                if !check {
+                    // collect stats for ping/pong verification
+                    stats.ping_cache_check_failed += 1;
+                }
+            }
+            stats.processed += 1;
+            let rsp = match Self::handle_sampling(
+                recycler, &from_addr, blockstore, request, stats, ping_cache,
+            ) {
+                None => continue,
+                Some(rsp) => rsp,
+            };
+            let num_response_packets = rsp.len();
+            let num_response_bytes = rsp.iter().map(|p| p.meta().size).sum();
+            if data_budget.take(num_response_bytes) && response_sender.send(rsp).is_ok() {
+                stats.total_response_packets += num_response_packets;
+                // match stake > 0 {
+                //     true => stats.total_response_bytes_staked += num_response_bytes,
+                //     false => stats.total_response_bytes_unstaked += num_response_bytes,
+                // }
+            } else {
+                stats.dropped_requests_outbound_bandwidth += requests_len - i;
+                stats.total_dropped_response_packets += num_response_packets;
+                break;
+            }
+        }
+
+        if !pending_pings.is_empty() {
+            stats.pings_sent += pending_pings.len();
+            let batch = PacketBatch::new(pending_pings);
+            let _ignore = response_sender.send(batch);
+        }
+    }
+    fn handle_sampling(
+        recycler: &PacketBatchRecycler,
+        from_addr: &SocketAddr,
+        blockstore: &Blockstore,
+        request: SampleProtocol,
+        stats: &mut ServeSamplesStats,
+        ping_cache: &mut PingCache,
+    ) -> Option<PacketBatch> {
+        let now = Instant::now();
+        let (res, label) = {
+            match &request {
+                SampleProtocol::RandomSamplesForSlot(ci, slot, i, shred_indices) => (None, "Pong"),
+                SampleProtocol::Pong(pong) => {
+                    stats.pong += 1;
+                    ping_cache.add(pong, *from_addr, Instant::now());
+                    (None, "Pong")
+                }
+            }
+        };
+        // Self::report_time_spent(label, &now.elapsed(), "");
+        res
+    }
     fn run_listen(
         &self,
         ping_cache: &mut PingCache,
@@ -65,7 +226,7 @@ impl ServeSamples {
         blockstore: &Blockstore,
         requests_receiver: &PacketBatchReceiver,
         response_sender: &PacketBatchSender,
-        stats: &mut ServeRepairStats,
+        stats: &mut ServeSamplesStats,
         data_budget: &DataBudget,
     ) -> Result<()> {
         //TODO cache connections
@@ -81,11 +242,11 @@ impl ServeSamples {
         let my_id = identity_keypair.pubkey();
 
         let max_buffered_packets = if root_bank.cluster_type() != ClusterType::MainnetBeta {
-            if self.repair_whitelist.read().unwrap().len() > 0 {
-                4 * MAX_REQUESTS_PER_ITERATION
-            } else {
-                2 * MAX_REQUESTS_PER_ITERATION
-            }
+            // if self.repair_whitelist.read().unwrap().len() > 0 { //@TODO disabling until we add crds
+            4 * MAX_REQUESTS_PER_ITERATION
+            // } else {
+            // 2 * MAX_REQUESTS_PER_ITERATION
+            // }
         } else {
             MAX_REQUESTS_PER_ITERATION
         };
@@ -107,7 +268,7 @@ impl ServeSamples {
         let mut decoded_requests = Vec::default();
         let mut whitelisted_request_count: usize = 0;
         {
-            let whitelist = self.repair_whitelist.read().unwrap();
+            // let whitelist = self.repair_whitelist.read().unwrap(); // @TODO
             for packet in reqs_v.iter().flatten() {
                 let request: SampleProtocol = match packet.deserialize_slice(..) {
                     Ok(request) => request,
@@ -123,38 +284,37 @@ impl ServeSamples {
                     continue;
                 }
 
-                if request.supports_signature() {
-                    // collect stats for signature verification
-                    Self::verify_signed_packet(&my_id, packet, &request, stats);
-                } else {
-                    stats.unsigned_requests += 1;
-                }
+                // if request.supports_signature() { // @TODO disabling until we add crds
+                //     // collect stats for signature verification
+                //     Self::verify_signed_packet(&my_id, packet, &request, stats);
+                // } else {
+                stats.unsigned_requests += 1;
+                // }
 
                 if request.sender() == &my_id {
                     stats.self_repair += 1;
                     continue;
                 }
 
-                let stake = epoch_staked_nodes
-                    .as_ref()
-                    .and_then(|stakes| stakes.get(request.sender()))
-                    .unwrap_or(&0);
-                if *stake == 0 {
-                    stats.handle_requests_unstaked += 1;
-                } else {
-                    stats.handle_requests_staked += 1;
-                }
+                // let stake = epoch_staked_nodes
+                //     .as_ref()
+                //     .and_then(|stakes| stakes.get(request.sender()))
+                //     .unwrap_or(&0);
+                // if *stake == 0 {
+                //     stats.handle_requests_unstaked += 1;
+                // } else {
+                //     stats.handle_requests_staked += 1;
+                // }
 
-                let whitelisted = whitelist.contains(request.sender());
-                if whitelisted {
-                    whitelisted_request_count += 1;
-                }
+                // let whitelisted = whitelist.contains(request.sender()); // @TODO disabling until we add crds
+                // if whitelisted {
+                //     whitelisted_request_count += 1;
+                // }
 
-                decoded_requests.push(RepairRequestWithMeta {
+                decoded_requests.push(SampleRequestWithMeta {
                     request,
                     from_addr,
-                    stake: *stake,
-                    whitelisted,
+                    // whitelisted, // @TODO
                 });
             }
         }
@@ -163,7 +323,7 @@ impl ServeSamples {
 
         if decoded_requests.len() > MAX_REQUESTS_PER_ITERATION {
             stats.dropped_requests_low_stake += decoded_requests.len() - MAX_REQUESTS_PER_ITERATION;
-            decoded_requests.sort_unstable_by_key(|r| Reverse((r.whitelisted, r.stake)));
+            // decoded_requests.sort_unstable_by_key(|r| Reverse((r.whitelisted, r.stake))); // @TODO
             decoded_requests.truncate(MAX_REQUESTS_PER_ITERATION);
         }
 
@@ -204,7 +364,7 @@ impl ServeSamples {
             .name("solRepairListen".to_string())
             .spawn(move || {
                 let mut last_print = Instant::now();
-                let mut stats = ServeRepairStats::default();
+                let mut stats = ServeSamplesStats::default();
                 let data_budget = DataBudget::default();
                 loop {
                     let result = self.run_listen(
@@ -236,12 +396,12 @@ impl ServeSamples {
 
 impl ShredSampleService {
     pub(crate) fn new(
-        serve_samples: ServeSamples
+        serve_samples: ServeSamples,
         socket: UdpSocket,
         blockstore: Arc<Blockstore>,
         socket_addr_space: SocketAddrSpace,
         exit: Arc<AtomicBool>,
-    ) -> Self{
+    ) -> Self {
         let (request_sender, request_receiver) = unbounded();
         let serve_samples_socket = Arc::new(socket);
         trace!(
@@ -277,6 +437,27 @@ impl ShredSampleService {
         }
         Ok(())
     }
+}
+
+fn check_ping_cache(
+    ping_cache: &mut PingCache,
+    request: &SampleProtocol,
+    from_addr: &SocketAddr,
+    identity_keypair: &Keypair,
+) -> (bool, Option<Packet>) {
+    let mut rng = rand::thread_rng();
+    let mut pingf = move || Ping::new_rand(&mut rng, identity_keypair).ok();
+    let (check, ping) =
+        ping_cache.check(Instant::now(), (*request.sender(), *from_addr), &mut pingf);
+    let ping_pkt = if let Some(ping) = ping {
+        match request {
+            SampleProtocol::RandomSamplesForSlot(_, _, _, _) => {}
+            SampleProtocol::Pong(_) => None,
+        }
+    } else {
+        None
+    };
+    (check, ping_pkt)
 }
 
 #[cfg(test)]

@@ -1175,10 +1175,8 @@ impl JsonRpcRequestProcessor {
         info!("block received {:?}", block);
 
         for outer_txn in block.unwrap().unwrap().transactions.unwrap() {
-            info!("check pt 1");
             match outer_txn.transaction {
                 EncodedTransaction::Json(inner_txn) => {
-                    info!("check pt 2 new {:?}", inner_txn.message);
                     match inner_txn.message {
                         solana_transaction_status::UiMessage::Parsed(message) => {
                             let aks = message
@@ -1187,15 +1185,12 @@ impl JsonRpcRequestProcessor {
                                 .into_iter()
                                 .map(|key| key.pubkey)
                                 .collect_vec();
-                            info!("accountks here {:?}", aks);
                             if aks.contains(&VOTE_PROGRAM_ID.to_string()) {
-                                info!("check pt 3");
                                 let vote_signature = Some(inner_txn.signatures[0].clone());
                                 let validator_identity;
                                 let mut validator_stake = None;
 
                                 let ixdata = message.instructions[0].clone();
-                                info!("LOL {:?} | {:?}", &ixdata, message.instructions);
                                 // let compiled_ix_data =
                                 //     solana_sdk::instruction::CompiledInstruction::new(
                                 //         ixdata..program_id_index.clone(),
@@ -1215,9 +1210,7 @@ impl JsonRpcRequestProcessor {
                                             .into_iter()
                                             .map(|k| Pubkey::from_str(&k.pubkey.as_str()).unwrap())
                                             .collect::<Vec<Pubkey>>();
-                                        info!("statickeys: {:?}", static_keys);
                                         let acc_keys = AccountKeys::new(&static_keys, None);
-                                        info!("acc keys qty {:?}", acc_keys.len(),);
                                         // let ci = CompiledInstruction::new(
                                         //     ixc.program_id_index.clone(),
                                         //     &ixc.data.clone(),
@@ -1229,11 +1222,10 @@ impl JsonRpcRequestProcessor {
                                         // );
                                         // info!("pv logged {:?}", pv);
                                         // let ix: ParsedInstructionEnum = pv.unwrap();
-                                        info!("KEM CHHO PARIK{:?}", &ixc);
+                                    
                                         // let vote_state = parse_vote_instruction_data()
                                         validator_identity =
                                             Some(message.account_keys.get(0).unwrap());
-                                        info!("validen");
                                         let stake_account = self.get_account_info(
                                             &Pubkey::from_str(
                                                 message.account_keys[1].pubkey.as_str(),
@@ -1248,9 +1240,7 @@ impl JsonRpcRequestProcessor {
                                         );
                                         // Error is returned here:==> stakeacc Err(Error { code: InvalidRequest, message: "Encoded binary (base 58) data should be less than 128 bytes, please use Base64 encoding.", data: None })
                                         // Passing the Base64 config works ig?
-                                        info!("stakeacc {:?}", stake_account);
                                         let stake_acc = stake_account.unwrap().value.unwrap().data;
-                                        info!("stakeaccun {:?}", stake_acc);
                                         let get_all_stake_accs = self.get_program_accounts(
                                             &Pubkey::from_str(
                                                 &"Stake11111111111111111111111111111111111111",
@@ -1266,18 +1256,15 @@ impl JsonRpcRequestProcessor {
                                             false,
                                         );
                                         let stakes = get_all_stake_accs.unwrap();
-                                        info!("hasu1");
                                         if let OptionalContext::NoContext(stks) = stakes {
-                                            info!("hasu2");
+                    
                                             for stk in stks {
-                                                info!("hasu3");
+
                                                 if let UiAccountData::Json(stka) = stk.account.data
                                                 {
-                                                    info!("hasu4 {:?}", stka.parsed);
                                                     let p: solana_account_decoder::parse_stake::StakeAccountType =
                                                         serde_json::from_value(stka.parsed)
                                                             .unwrap();
-                                                    info!("pstakestate {:?}", p);
                                                     match p {
                                                         StakeAccountType::Delegated(dps) => {
                                                             validator_stake = Some(

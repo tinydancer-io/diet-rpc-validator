@@ -4548,6 +4548,7 @@ version = "0.1.0"
 dependencies = [
  "crossbeam-channel",
  "log",
+ "rand 0.8.5",
  "serde",
  "serde_derive",
  "solana-core",
@@ -4555,6 +4556,7 @@ dependencies = [
  "solana-ledger",
  "solana-logger 1.15.0",
  "solana-perf",
+ "solana-runtime",
  "solana-sdk 1.15.0",
  "solana-streamer",
  "tokio",
