@@ -19,10 +19,10 @@ pub struct BlockHeader {
     pub validator_identity: Vec<Option<Pubkey>>,
     pub validator_stake: Vec<Option<u64>>,
 }
-
 ```
 
 #### Get block headers endpoint ```get_block_headers``` 
+Returns the requested block header by the slot number and block configuration
 
 Input params:
 + Slot
@@ -32,7 +32,8 @@ Output:
 + ```BlockHeader``` 
 
 #### Get shreds endpoint ```get_shreds```
- 
+Returns the requested shreds upon call filtered by the slot number and indices
+
  Input params:
  + Slot
  + Shred Indices
@@ -40,7 +41,6 @@ Output:
  Output:
  + ```Vec<Option<Shred>>```
  
-
 # Building
 
 ## **1. Install rustc, cargo and rustfmt.**
