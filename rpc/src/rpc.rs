@@ -1,5 +1,7 @@
 //! The `rpc` module implements the Solana RPC interface.
 
+use std::ops::Deref;
+
 use itertools::Itertools;
 use serde::Serialize;
 use solana_account_decoder::{
@@ -7,6 +9,7 @@ use solana_account_decoder::{
     parse_vote::{UiVoteState, VoteAccountType},
     UiAccountData,
 };
+use solana_ledger::shred::Shred;
 use solana_runtime::{account_info::AccountInfo, vote_parser::ParsedVote};
 use solana_sdk::{instruction::CompiledInstruction, message::AccountKeys};
 use solana_transaction_status::{
@@ -1168,7 +1171,6 @@ impl JsonRpcRequestProcessor {
         slot: Slot,
         config: Option<RpcEncodingConfigWrapper<RpcBlockConfig>>,
     ) -> Result<BlockHeader> {
-        info!("yup reaches here &&%% 4444");
         const VOTE_PROGRAM_ID: &str = "Vote111111111111111111111111111111111111111";
         let block = self.get_block(slot, config).await;
         let mut block_header: BlockHeader = BlockHeader::default();
@@ -1298,7 +1300,47 @@ impl JsonRpcRequestProcessor {
         }
         Ok(block_header)
     }
-
+    pub async fn get_shreds(
+        &self,
+        slot: Slot,
+        shred_indices: Vec<u64>,
+        config: Option<RpcShredConfig>,
+    ) -> Result<Vec<Option<Shred>>> {
+        let mut shreds = shred_indices
+            .iter()
+            .map(|i| {
+                let ds = if let Ok(shred) = self.blockstore.get_data_shred(slot, *i) {
+                    if let Some(shred_data) = shred {
+                        if let Ok(serialized_shred) = Shred::new_from_serialized_shred(shred_data) {
+                            Some(serialized_shred)
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                };
+                let cs = if let Ok(shred) = self.blockstore.get_coding_shred(slot, *i) {
+                    if let Some(shred_data) = shred {
+                        if let Ok(serialized_shred) = Shred::new_from_serialized_shred(shred_data) {
+                            Some(serialized_shred)
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                };
+                [ds, cs]
+            })
+            .collect::<Vec<[Option<Shred>; 2]>>();
+        let shreds = shreds.into_iter().flatten().collect::<Vec<_>>();
+        Ok(shreds)
+    }
     pub async fn get_blocks(
         &self,
         start_slot: Slot,
@@ -3405,6 +3447,8 @@ pub mod rpc_accounts_scan {
 // Full RPC interface that an API node is expected to provide
 // (rpc_minimal should also be provided by an API node)
 pub mod rpc_full {
+    use solana_ledger::shred::Shred;
+
     use {
         super::*,
         solana_sdk::message::{SanitizedVersionedMessage, VersionedMessage},
@@ -3488,6 +3532,14 @@ pub mod rpc_full {
             slot: Slot,
             config: Option<RpcEncodingConfigWrapper<RpcBlockConfig>>,
         ) -> BoxFuture<Result<BlockHeader>>;
+        #[rpc(meta, name = "getShreds")]
+        fn get_shreds(
+            &self,
+            meta: Self::Metadata,
+            slot: Slot,
+            shred_indices: Vec<u64>,
+            config: Option<RpcShredConfig>,
+        ) -> BoxFuture<Result<Vec<Option<Shred>>>>;
 
         #[rpc(meta, name = "getBlockTime")]
         fn get_block_time(
@@ -3983,6 +4035,16 @@ pub mod rpc_full {
         ) -> BoxFuture<Result<BlockHeader>> {
             debug!("get_block_headers rpc request received: {:?}", slot);
             Box::pin(async move { meta.get_block_headers(slot, config).await })
+        }
+        fn get_shreds(
+            &self,
+            meta: Self::Metadata,
+            slot: Slot,
+            shred_indices: Vec<u64>,
+            config: Option<RpcShredConfig>,
+        ) -> BoxFuture<Result<Vec<Option<Shred>>>> {
+            debug!("get_shreds rpc request received: {:?}", slot);
+            Box::pin(async move { meta.get_shreds(slot, shred_indices, config).await })
         }
 
         fn get_blocks(
@@ -7042,23 +7104,14 @@ pub mod tests {
     }
     #[test]
     fn test_get_block_headers() {
-        let server_details = "107.155.66.146:8899";
-        let faucet_addr: SocketAddr = server_details
-            .parse()
-            .expect("Unable to parse socket address");
-        let config = JsonRpcConfig {
-            faucet_addr: Some(faucet_addr),
-            enable_rpc_transaction_history: true,
-            ..JsonRpcConfig::default_for_test()
-        };
-        let rpc = RpcHandler::start_with_config(config);
-        // let confirmed_block_signatures = rpc.create_test_transactions_and_populate_blockstore();
+        let rpc = RpcHandler::start();
+        let confirmed_block_signatures = rpc.create_test_transactions_and_populate_blockstore();
         println!("pre req {:?}", rpc.blockstore.highest_slot());
-        let request = create_test_request("getBlockHeaders", Some(json!([184249258])));
+        let request = create_test_request("getBlockHeaders", Some(json!([0u64])));
         // println!("res {:?}", result);
-        let req = rpc.handle_request_sync(request);
-        // println!("req {:?}", req);
-        let result: Option<Vec<BlockHeader>> = parse_success_result(req);
+        let res = rpc.handle_request_sync(request);
+        println!("req {:?}", res);
+        let result: Option<Vec<BlockHeader>> = parse_success_result(res);
         println!("res {:?}", result);
         let confirmed_block = result.unwrap();
         println!("{:?}", confirmed_block);

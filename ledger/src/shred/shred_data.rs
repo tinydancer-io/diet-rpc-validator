@@ -1,3 +1,5 @@
+use serde::{Deserialize, Serialize};
+
 use {
     crate::shred::{
         self,
@@ -10,7 +12,7 @@ use {
     solana_sdk::{clock::Slot, signature::Signature},
 };
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
 pub enum ShredData {
     Legacy(legacy::ShredData),
     Merkle(merkle::ShredData),

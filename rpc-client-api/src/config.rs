@@ -265,6 +265,12 @@ pub struct RpcBlockConfig {
     pub max_supported_transaction_version: Option<u8>,
 }
 
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct RpcShredConfig {
+    pub commitment: Option<CommitmentConfig>,
+}
+
 impl EncodingConfig for RpcBlockConfig {
     fn new_with_encoding(encoding: &Option<UiTransactionEncoding>) -> Self {
         Self {

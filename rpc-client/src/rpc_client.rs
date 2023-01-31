@@ -10,6 +10,7 @@
 //! in [`crate::nonblocking::rpc_client`].
 
 pub use crate::mock_sender::Mocks;
+use solana_ledger::shred::Shred;
 #[allow(deprecated)]
 use solana_rpc_client_api::deprecated_config::{
     RpcConfirmedBlockConfig, RpcConfirmedTransactionConfig,
@@ -2049,6 +2050,13 @@ impl RpcClient {
 
     pub fn get_block_headers(&self, slot: Slot) -> ClientResult<BlockHeader> {
         self.invoke((self.rpc_client.as_ref()).get_block_headers(slot, UiTransactionEncoding::Json))
+    }
+    pub fn get_shreds(
+        &self,
+        slot: Slot,
+        shred_indices: Vec<u64>,
+    ) -> ClientResult<Vec<Option<Shred>>> {
+        self.invoke((self.rpc_client.as_ref()).get_shreds(slot, shred_indices))
     }
 
     /// Returns identity and transaction information about a confirmed block in the ledger.

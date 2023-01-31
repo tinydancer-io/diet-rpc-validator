@@ -7,6 +7,7 @@
 //! [JSON-RPC]: https://www.jsonrpc.org/specification
 
 pub use crate::mock_sender::Mocks;
+use solana_ledger::shred::Shred;
 #[allow(deprecated)]
 use solana_rpc_client_api::deprecated_config::{
     RpcConfirmedBlockConfig, RpcConfirmedTransactionConfig,
@@ -2526,6 +2527,17 @@ impl RpcClient {
         self.send(
             self.maybe_map_request(RpcRequest::GetBlockHeaders).await?,
             json!([slot, encoding]),
+        )
+        .await
+    }
+    pub async fn get_shreds(
+        &self,
+        slot: Slot,
+        shred_indices: Vec<u64>,
+    ) -> ClientResult<Vec<Option<Shred>>> {
+        self.send(
+            self.maybe_map_request(RpcRequest::GetShreds).await?,
+            json!([slot, shred_indices]),
         )
         .await
     }

@@ -1,3 +1,5 @@
+use serde::{Deserialize, Serialize};
+
 use {
     crate::{
         shred::{
@@ -19,7 +21,7 @@ pub(crate) const MAX_CODE_SHREDS_PER_SLOT: usize =
 
 const_assert_eq!(ShredCode::SIZE_OF_PAYLOAD, 1228);
 
-#[derive(Clone, Debug, Eq, PartialEq)]
+#[derive(Clone, Debug, Eq, PartialEq, Deserialize, Serialize)]
 pub enum ShredCode {
     Legacy(legacy::ShredCode),
     Merkle(merkle::ShredCode),
