@@ -11,7 +11,8 @@
 
 # Diet client specific Changes
 Added two methods for our stage-1 in the ```diet-rpc-validator/rpc.rs```
-Block Header type
+
+#### Block Header type
 ```
 pub struct BlockHeader {
     pub vote_signature: Vec<Option<String>>,
