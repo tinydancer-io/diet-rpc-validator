@@ -9,6 +9,37 @@
 [![Build status](https://badge.buildkite.com/8cc350de251d61483db98bdfc895b9ea0ac8ffa4a32ee850ed.svg?branch=master)](https://buildkite.com/solana-labs/solana/builds?branch=master)
 [![codecov](https://codecov.io/gh/solana-labs/solana/branch/master/graph/badge.svg)](https://codecov.io/gh/solana-labs/solana)
 
+# Diet client specific Changes
+Added two methods for our stage-1 in the ```diet-rpc-validator/rpc.rs```
+Block Header type
+```
+pub struct BlockHeader {
+    pub vote_signature: Vec<Option<String>>,
+    pub validator_identity: Vec<Option<Pubkey>>,
+    pub validator_stake: Vec<Option<u64>>,
+}
+
+```
+
+#### Get block headers endpoint ```get_block_headers``` 
+
+Input params:
++ Slot
++ RpcBlockConfig
+
+Output: 
++ ```BlockHeader``` 
+
+#### Get shreds endpoint ```get_shreds```
+ 
+ Input params:
+ + Slot
+ + Shred Indices
+ 
+ Output:
+ + ```Vec<Option<Shred>>```
+ 
+
 # Building
 
 ## **1. Install rustc, cargo and rustfmt.**
