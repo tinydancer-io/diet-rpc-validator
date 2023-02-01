@@ -21,7 +21,7 @@ pub struct BlockHeader {
 }
 ```
 
-#### Get block headers endpoint ```get_block_headers``` 
+#### Get block headers method ```get_block_headers``` 
 Returns the requested block header by the slot number and block configuration
 
 Input params:
@@ -31,7 +31,7 @@ Input params:
 Output: 
 + ```BlockHeader``` 
 
-#### Get shreds endpoint ```get_shreds```
+#### Get shreds method ```get_shreds```
 Returns the requested shreds upon call filtered by the slot number and indices
 
  Input params:
