@@ -1,1 +1,1 @@
-./target/release/solana-test-validator 
+./target/release/solana-test-validator --rpc-pubsub-enable-vote-subscription

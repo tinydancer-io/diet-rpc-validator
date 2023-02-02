@@ -520,15 +520,15 @@ impl Shred {
             _ => Err(Error::InvalidShredType),
         }
     }
-
-    pub(crate) fn num_data_shreds(&self) -> Result<u16, Error> {
+    //setting visibility to public
+    pub fn num_data_shreds(&self) -> Result<u16, Error> {
         match self {
             Self::ShredCode(shred) => Ok(shred.num_data_shreds()),
             Self::ShredData(_) => Err(Error::InvalidShredType),
         }
     }
-
-    pub(crate) fn num_coding_shreds(&self) -> Result<u16, Error> {
+    //setting visibility to public
+    pub fn num_coding_shreds(&self) -> Result<u16, Error> {
         match self {
             Self::ShredCode(shred) => Ok(shred.num_coding_shreds()),
             Self::ShredData(_) => Err(Error::InvalidShredType),
