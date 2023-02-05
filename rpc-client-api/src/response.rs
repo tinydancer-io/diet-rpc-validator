@@ -266,6 +266,12 @@ pub enum RpcSignatureResult {
     ProcessedSignature(ProcessedSignatureResult),
     ReceivedSignature(ReceivedSignatureResult),
 }
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct GetShredResponse {
+    pub shreds: Vec<Option<solana_ledger::shred::Shred>>,
+    pub leader: String,
+}
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, Eq)]
 #[serde(rename_all = "camelCase")]

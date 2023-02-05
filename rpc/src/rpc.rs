@@ -1305,7 +1305,19 @@ impl JsonRpcRequestProcessor {
         slot: Slot,
         shred_indices: Vec<u64>,
         config: Option<RpcShredConfig>,
-    ) -> Result<Vec<Option<Shred>>> {
+    ) -> Result<GetShredResponse> {
+        let leader = {
+            let commitment = if let Some(conf) = config {
+                conf.commitment
+            } else {
+                None
+            };
+            let bank = self.get_bank_with_config(RpcContextConfig {
+                commitment,
+                min_context_slot: Some(slot),
+            })?;
+            bank.collector_id().to_string()
+        };
         let mut shreds = shred_indices
             .iter()
             .map(|i| {
@@ -1339,7 +1351,7 @@ impl JsonRpcRequestProcessor {
             })
             .collect::<Vec<[Option<Shred>; 2]>>();
         let shreds = shreds.into_iter().flatten().collect::<Vec<_>>();
-        Ok(shreds)
+        Ok(GetShredResponse { shreds, leader })
     }
     pub async fn get_blocks(
         &self,
@@ -3539,7 +3551,7 @@ pub mod rpc_full {
             slot: Slot,
             shred_indices: Vec<u64>,
             config: Option<RpcShredConfig>,
-        ) -> BoxFuture<Result<Vec<Option<Shred>>>>;
+        ) -> BoxFuture<Result<GetShredResponse>>;
 
         #[rpc(meta, name = "getBlockTime")]
         fn get_block_time(
@@ -4042,7 +4054,7 @@ pub mod rpc_full {
             slot: Slot,
             shred_indices: Vec<u64>,
             config: Option<RpcShredConfig>,
-        ) -> BoxFuture<Result<Vec<Option<Shred>>>> {
+        ) -> BoxFuture<Result<GetShredResponse>> {
             debug!("get_shreds rpc request received: {:?}", slot);
             Box::pin(async move { meta.get_shreds(slot, shred_indices, config).await })
         }
