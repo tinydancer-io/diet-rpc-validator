@@ -184,8 +184,8 @@ impl ShredData {
         let chunk = self.erasure_shard_as_slice()?;
         Ok(hashv(&[MERKLE_HASH_PREFIX_LEAF, chunk]))
     }
-
-    fn verify_merkle_proof(&self) -> Result<bool, Error> {
+    // making this public so we can verify merkle shreds on diet client
+    pub fn verify_merkle_proof(&self) -> Result<bool, Error> {
         let node = self.merkle_tree_node()?;
         let index = self.erasure_shard_index()?;
         Ok(verify_merkle_proof(index, node, &self.merkle_branch()?))

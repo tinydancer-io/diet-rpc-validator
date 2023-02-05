@@ -1313,7 +1313,7 @@ impl JsonRpcRequestProcessor {
                 None
             };
             let bank = self.get_bank_with_config(RpcContextConfig {
-                commitment,
+                commitment: Some(CommitmentConfig::confirmed()),
                 min_context_slot: Some(slot),
             })?;
             bank.collector_id().to_string()
