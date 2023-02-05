@@ -2,8 +2,8 @@ use {
     crate::shred::{CodingShredHeader, DataShredHeader, Error, ShredCommonHeader},
     solana_sdk::{clock::Slot, signature::Signature},
 };
-
-pub(super) trait Shred: Sized {
+// making trait public so can be accessed in client
+pub trait Shred: Sized {
     // Total size of payload including headers, merkle
     // branches (if any), zero paddings, etc.
     const SIZE_OF_PAYLOAD: usize;

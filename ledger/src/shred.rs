@@ -51,7 +51,7 @@
 
 #[cfg(test)]
 pub(crate) use shred_code::MAX_CODE_SHREDS_PER_SLOT;
-use {
+pub use {
     self::{shred_code::ShredCode, traits::Shred as _},
     crate::blockstore::{self, MAX_DATA_SHREDS_PER_SLOT},
     bitflags::bitflags,
@@ -200,7 +200,8 @@ enum ShredVariant {
 
 /// A common header that is present in data and code shred headers
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Deserialize, Serialize)]
-struct ShredCommonHeader {
+pub struct ShredCommonHeader {
+    // making struct public
     signature: Signature,
     shred_variant: ShredVariant,
     slot: Slot,
