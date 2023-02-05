@@ -275,7 +275,7 @@ impl ErasureSetId {
         (self.0, u64::from(self.1))
     }
 }
-
+#[macro_export]
 macro_rules! dispatch {
     ($vis:vis fn $name:ident(&self $(, $arg:ident : $ty:ty)?) $(-> $out:ty)?) => {
         #[inline]
@@ -306,7 +306,7 @@ macro_rules! dispatch {
     }
 }
 
-use dispatch;
+pub use dispatch;
 
 impl Shred {
     dispatch!(fn common_header(&self) -> &ShredCommonHeader);
