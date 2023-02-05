@@ -23,6 +23,7 @@ pub mod leader_schedule_cache;
 pub mod leader_schedule_utils;
 pub mod next_slots_iterator;
 pub mod rooted_slot_iterator;
+#[macro_use]
 pub mod shred;
 mod shredder;
 pub mod sigverify_shreds;
