@@ -306,8 +306,8 @@ impl ShredCode {
             .ok_or(Error::InvalidPayloadSize(self.payload.len()))?;
         Ok(hashv(&[MERKLE_HASH_PREFIX_LEAF, chunk]))
     }
-
-    fn verify_merkle_proof(&self) -> Result<bool, Error> {
+    // making function public to access on diet client
+    pub fn verify_merkle_proof(&self) -> Result<bool, Error> {
         let node = self.merkle_tree_node()?;
         let index = self.erasure_shard_index()?;
         Ok(verify_merkle_proof(index, node, &self.merkle_branch()?))
