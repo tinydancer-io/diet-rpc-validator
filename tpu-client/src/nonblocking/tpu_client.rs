@@ -286,7 +286,6 @@ impl<P: ConnectionPool> TpuClient<P> {
         let wire_transaction = serialize(transaction).expect("serialization should succeed");
         self.send_wire_transaction(wire_transaction).await
     }
-    ///Hasu adds here....
     pub fn estimated_current_slot(&self) -> Slot {
         self.leader_tpu_service.estimated_current_slot()
     }
