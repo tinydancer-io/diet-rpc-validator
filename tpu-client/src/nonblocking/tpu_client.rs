@@ -286,7 +286,10 @@ impl<P: ConnectionPool> TpuClient<P> {
         let wire_transaction = serialize(transaction).expect("serialization should succeed");
         self.send_wire_transaction(wire_transaction).await
     }
-
+    ///Hasu adds here....
+    pub fn estimated_current_slot(&self) -> Slot {
+        self.leader_tpu_service.estimated_current_slot()
+    }
     /// Send a wire transaction to the current and upcoming leader TPUs according to fanout size
     pub async fn send_wire_transaction(&self, wire_transaction: Vec<u8>) -> bool {
         self.try_send_wire_transaction(wire_transaction)

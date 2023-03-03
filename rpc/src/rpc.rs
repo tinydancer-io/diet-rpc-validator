@@ -1318,6 +1318,7 @@ impl JsonRpcRequestProcessor {
             })?;
             bank.collector_id().to_string()
         };
+
         let mut shreds = shred_indices
             .iter()
             .map(|i| {
@@ -1353,6 +1354,7 @@ impl JsonRpcRequestProcessor {
         let shreds = shreds.into_iter().flatten().collect::<Vec<_>>();
         Ok(GetShredResponse { shreds, leader })
     }
+
     pub async fn get_blocks(
         &self,
         start_slot: Slot,
