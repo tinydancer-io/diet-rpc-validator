@@ -1,4 +1,4 @@
-/home/admin/diet-rpc-validator/target/release/solana-validator \
+/home/debian/diet-rpc-validator/target/release/solana-validator \
   --identity ./test-keypair.json \
   --vote-account ./test-keypair.json \
   --rpc-port 8899 \
@@ -6,13 +6,14 @@
   --limit-ledger-size \
   --no-voting \
   --no-os-network-limits-test \
+  --minimal-snapshot-download-speed 100000000 \
   --skip-poh-verify \
-  --no-poh-speed-test \
-  --no-genesis-fetch \
   --no-snapshot-fetch \
+  --no-genesis-fetch \
+  --no-poh-speed-test \
   --full-rpc-api \
   --enable-rpc-transaction-history \
-  --log /mnt/logs/solana-validator.log \
-  --accounts /mnt/accounts \
+  --log solana-validator.log \
+  --accounts /mnt/solana-accounts \
   --ledger /mnt/ledger \
   --snapshots /mnt/snapshots
