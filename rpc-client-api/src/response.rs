@@ -51,7 +51,7 @@ pub struct LiteRpcResponseContext {
     pub slot: Slot,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub api_version: Option<RpcApiVersion>,
-    pub sampled: bool
+    pub sampled: bool,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -103,6 +103,11 @@ impl RpcResponseContext {
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Response<T> {
     pub context: RpcResponseContext,
+    pub value: T,
+}
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct LiteResponse<T> {
+    pub context: LiteRpcResponseContext,
     pub value: T,
 }
 
