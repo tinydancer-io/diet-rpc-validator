@@ -45,6 +45,14 @@ pub struct RpcResponseContext {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub api_version: Option<RpcApiVersion>,
 }
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct LiteRpcResponseContext {
+    pub slot: Slot,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub api_version: Option<RpcApiVersion>,
+    pub sampled: bool
+}
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct RpcApiVersion(semver::Version);
