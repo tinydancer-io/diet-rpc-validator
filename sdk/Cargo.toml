@@ -1,5 +1,5 @@
 [package]
-name = "solana-sdk"
+name = "tiny-sdk"
 version = "1.15.0"
 description = "Solana SDK"
 authors = ["Solana Maintainers <maintainers@solana.foundation>"]

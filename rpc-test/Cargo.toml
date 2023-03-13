@@ -25,11 +25,11 @@ solana-pubsub-client = { path = "../pubsub-client", version = "=1.15.0" }
 solana-rpc = { path = "../rpc", version = "=1.15.0" }
 solana-rpc-client = { path = "../rpc-client", version = "=1.15.0", default-features = false }
 solana-rpc-client-api = { path = "../rpc-client-api", version = "=1.15.0" }
-solana-sdk = { path = "../sdk", version = "=1.15.0" }
+solana-sdk = { version = "1.15.0", package="tiny-sdk" }
 solana-streamer = { path = "../streamer", version = "=1.15.0" }
 solana-test-validator = { path = "../test-validator", version = "=1.15.0" }
 solana-tpu-client = { path = "../tpu-client", version = "=1.15.0", default-features = false }
-solana-transaction-status = { path = "../transaction-status", version = "=1.15.0" }
+solana-transaction-status = {  version = "1", package="tiny-transaction-status" }
 tokio = { version = "~1.14.1", features = ["full"] }
 
 [dev-dependencies]

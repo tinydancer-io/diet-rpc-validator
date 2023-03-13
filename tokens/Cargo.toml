@@ -25,8 +25,8 @@ solana-cli-config = { path = "../cli-config", version = "=1.15.0" }
 solana-remote-wallet = { path = "../remote-wallet", version = "=1.15.0" }
 solana-rpc-client = { path = "../rpc-client", version = "=1.15.0" }
 solana-rpc-client-api = { path = "../rpc-client-api", version = "=1.15.0" }
-solana-sdk = { path = "../sdk", version = "=1.15.0" }
-solana-transaction-status = { path = "../transaction-status", version = "=1.15.0" }
+solana-sdk = { version = "1.15.0", package="tiny-sdk" }
+solana-transaction-status = {  version = "1", package="tiny-transaction-status" }
 solana-version = { path = "../version", version = "=1.15.0" }
 spl-associated-token-account = { version = "=1.1.2" }
 spl-token = { version = "=3.5.0", features = ["no-entrypoint"] }

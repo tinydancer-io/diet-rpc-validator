@@ -28,9 +28,9 @@ serde = "1.0.144"
 serde_derive = "1.0.103"
 smpl_jwt = "0.7.1"
 solana-metrics = { path = "../metrics", version = "=1.15.0" }
-solana-sdk = { path = "../sdk", version = "=1.15.0" }
+solana-sdk = { version = "1.15.0", package="tiny-sdk" }
 solana-storage-proto = { path = "../storage-proto", version = "=1.15.0" }
-solana-transaction-status = { path = "../transaction-status", version = "=1.15.0" }
+solana-transaction-status = {  version = "1", package="tiny-transaction-status" }
 thiserror = "1.0"
 tokio = "1"
 tonic = { version = "0.8.0", features = ["tls", "transport"] }

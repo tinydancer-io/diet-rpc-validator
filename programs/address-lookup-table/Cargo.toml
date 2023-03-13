@@ -23,7 +23,7 @@ thiserror = "1.0"
 
 [target.'cfg(not(target_os = "solana"))'.dependencies]
 solana-program-runtime = { path = "../../program-runtime", version = "=1.15.0" }
-solana-sdk = { path = "../../sdk", version = "=1.15.0" }
+solana-sdk = { version = "1.15.0", package="tiny-sdk" }
 
 [build-dependencies]
 rustc_version = "0.4"
