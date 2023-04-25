@@ -1,19 +1,17 @@
-/home/debian/diet-rpc-validator/target/release/solana-validator \
+sudo RUST_BACKTRACE=full /home/ubuntu/diet-rpc-validator/target/release/solana-validator \
   --identity ./test-keypair.json \
   --vote-account ./test-keypair.json \
-  --rpc-port 8899 \
-  --entrypoint entrypoint.devnet.solana.com:8001 \
+  --rpc-port 8891 \
+  --entrypoint entrypoint.testnet.solana.com:8001 \
   --limit-ledger-size \
   --no-voting \
   --no-os-network-limits-test \
   --minimal-snapshot-download-speed 100000000 \
   --skip-poh-verify \
-  --no-snapshot-fetch \
-  --no-genesis-fetch \
   --no-poh-speed-test \
   --full-rpc-api \
   --enable-rpc-transaction-history \
-  --log solana-validator.log \
-  --accounts /mnt/solana-accounts \
+  --log /home/ubuntu/diet-rpc-validator/solana-validator.log \
+  --accounts /mnt/accounts \
   --ledger /mnt/ledger \
   --snapshots /mnt/snapshots

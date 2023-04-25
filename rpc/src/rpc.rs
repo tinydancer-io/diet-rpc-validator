@@ -1,7 +1,5 @@
 //! The `rpc` module implements the Solana RPC interface.
 
-use std::ops::Deref;
-
 use itertools::Itertools;
 use serde::Serialize;
 use solana_account_decoder::{
@@ -9,7 +7,6 @@ use solana_account_decoder::{
     parse_vote::{UiVoteState, VoteAccountType},
     UiAccountData,
 };
-use solana_ledger::shred::Shred;
 use solana_runtime::{account_info::AccountInfo, vote_parser::ParsedVote};
 use solana_sdk::{instruction::CompiledInstruction, message::AccountKeys};
 use solana_transaction_status::{
@@ -1177,182 +1174,114 @@ impl JsonRpcRequestProcessor {
 
         for outer_txn in block.unwrap().unwrap().transactions.unwrap() {
             match outer_txn.transaction {
-                EncodedTransaction::Json(inner_txn) => match inner_txn.message {
-                    solana_transaction_status::UiMessage::Parsed(message) => {
-                        let aks = message
-                            .account_keys
-                            .clone()
-                            .into_iter()
-                            .map(|key| key.pubkey)
-                            .collect_vec();
+                EncodedTransaction::Json(inner_txn) => {
+                    match inner_txn.message {
+                        solana_transaction_status::UiMessage::Parsed(message) => {
+                            let aks = message
+                                .account_keys
+                                .clone()
+                                .into_iter()
+                                .map(|key| key.pubkey)
+                                .collect_vec();
+                            if aks.contains(&VOTE_PROGRAM_ID.to_string()) {
+                                let vote_signature = Some(inner_txn.signatures[0].clone());
+                                let validator_identity;
+                                let mut validator_stake = None;
 
-                        if aks.contains(&VOTE_PROGRAM_ID.to_string()) {
-                            let vote_signature = Some(inner_txn.signatures[0].clone());
-                            let validator_identity;
-                            let mut validator_stake = None;
+                                let ixdata = message.instructions[0].clone();
 
-                            let ixdata = message.instructions[0].clone();
+                                match ixdata {
+                                    UiInstruction::Parsed(ixc) => {
+                                        let static_keys = message
+                                            .account_keys
+                                            .clone()
+                                            .into_iter()
+                                            .map(|k| Pubkey::from_str(&k.pubkey.as_str()).unwrap())
+                                            .collect::<Vec<Pubkey>>();
+                                        let acc_keys = AccountKeys::new(&static_keys, None);
 
-                            match ixdata {
-                                UiInstruction::Parsed(ixc) => {
-                                    let static_keys = message
-                                        .account_keys
-                                        .clone()
-                                        .into_iter()
-                                        .map(|k| Pubkey::from_str(&k.pubkey.as_str()).unwrap())
-                                        .collect::<Vec<Pubkey>>();
-
-                                    let acc_keys = AccountKeys::new(&static_keys, None);
-
-                                    validator_identity = Some(message.account_keys.get(0).unwrap());
-                                    info!("validen");
-                                    let stake_account = self.get_account_info(
-                                        &Pubkey::from_str(message.account_keys[1].pubkey.as_str())
+                                        validator_identity =
+                                            Some(message.account_keys.get(0).unwrap());
+                                        let stake_account = self.get_account_info(
+                                            &Pubkey::from_str(
+                                                message.account_keys[1].pubkey.as_str(),
+                                            )
                                             .unwrap(),
-                                        Some(RpcAccountInfoConfig {
-                                            encoding: Some(UiAccountEncoding::JsonParsed),
-                                            data_slice: None,
-                                            commitment: None,
-                                            min_context_slot: Some(1),
-                                        }),
-                                    );
-
-                                    let stake_acc = stake_account.unwrap().value.unwrap().data;
-
-                                    let get_all_stake_accs = self.get_program_accounts(
-                                        &Pubkey::from_str(
-                                            &"Stake11111111111111111111111111111111111111",
-                                        )
-                                        .unwrap(),
-                                        Some(RpcAccountInfoConfig {
-                                            encoding: Some(UiAccountEncoding::JsonParsed),
-                                            data_slice: None,
-                                            commitment: None,
-                                            min_context_slot: Some(1),
-                                        }),
-                                        vec![],
-                                        false,
-                                    );
-                                    let stakes = get_all_stake_accs.unwrap();
-
-                                    if let OptionalContext::NoContext(stks) = stakes {
-                                        for stk in stks {
-                                            if let UiAccountData::Json(stka) = stk.account.data {
-                                                let p: solana_account_decoder::parse_stake::StakeAccountType =
+                                            Some(RpcAccountInfoConfig {
+                                                encoding: Some(UiAccountEncoding::JsonParsed),
+                                                data_slice: None,
+                                                commitment: None,
+                                                min_context_slot: Some(1),
+                                            }), // Seems like we have to pass a config here instead of a None
+                                        );
+                                        // Error is returned here:==> stakeacc Err(Error { code: InvalidRequest, message: "Encoded binary (base 58) data should be less than 128 bytes, please use Base64 encoding.", data: None })
+                                        // Passing the Base64 config works ig?
+                                        let stake_acc = stake_account.unwrap().value.unwrap().data;
+                                        let get_all_stake_accs = self.get_program_accounts(
+                                            &Pubkey::from_str(
+                                                &"Stake11111111111111111111111111111111111111",
+                                            )
+                                            .unwrap(),
+                                            Some(RpcAccountInfoConfig {
+                                                encoding: Some(UiAccountEncoding::JsonParsed),
+                                                data_slice: None,
+                                                commitment: None,
+                                                min_context_slot: Some(1),
+                                            }),
+                                            vec![],
+                                            false,
+                                        );
+                                        let stakes = get_all_stake_accs.unwrap();
+                                        if let OptionalContext::NoContext(stks) = stakes {
+                                            for stk in stks {
+                                                if let UiAccountData::Json(stka) = stk.account.data
+                                                {
+                                                    let p: solana_account_decoder::parse_stake::StakeAccountType =
                                                         serde_json::from_value(stka.parsed)
                                                             .unwrap();
 
-                                                match p {
-                                                    StakeAccountType::Delegated(dps) => {
-                                                        validator_stake = Some(
-                                                            dps.stake
-                                                                .unwrap()
-                                                                .delegation
-                                                                .stake
-                                                                .parse::<u64>()
-                                                                .unwrap(),
-                                                        )
+                                                    match p {
+                                                        StakeAccountType::Delegated(dps) => {
+                                                            validator_stake = Some(
+                                                                dps.stake
+                                                                    .unwrap()
+                                                                    .delegation
+                                                                    .stake
+                                                                    .parse::<u64>()
+                                                                    .unwrap(),
+                                                            )
+                                                        }
+                                                        StakeAccountType::Initialized(ips) => {}
+                                                        _ => {
+                                                            validator_stake = None;
+                                                        }
                                                     }
-                                                    StakeAccountType::Initialized(ips) => {}
-                                                    _ => {}
                                                 }
                                             }
                                         }
-                                    }
 
-                                    match stake_acc.clone() {
-                                        UiAccountData::Json(stake_acc) => {
-                                            let parsed = serde_json::from_value::<UiStakeAccount>(
-                                                stake_acc.parsed,
+                                        block_header.validator_identity.push(Some(
+                                            Pubkey::from_str(
+                                                validator_identity.unwrap().pubkey.as_str(),
                                             )
-                                            .unwrap();
-
-                                            validator_stake = Some(
-                                                parsed
-                                                    .stake
-                                                    .unwrap()
-                                                    .delegation
-                                                    .stake
-                                                    .parse::<u64>()
-                                                    .unwrap(),
-                                            );
-                                        }
-                                        _ => {}
-                                    };
-
-                                    block_header.validator_identity.push(Some(
-                                        Pubkey::from_str(
-                                            validator_identity.unwrap().pubkey.as_str(),
-                                        )
-                                        .unwrap(),
-                                    ));
-                                    block_header.validator_stake.push(validator_stake);
-                                    block_header.vote_signature.push(vote_signature);
+                                            .unwrap(),
+                                        ));
+                                        block_header.validator_stake.push(validator_stake);
+                                        block_header.vote_signature.push(vote_signature);
+                                    }
+                                    _ => (),
                                 }
-                                _ => (),
                             }
                         }
+                        _ => {
+                            error!("failing here {:?}", inner_txn.message);
+                        }
                     }
-                    _ => {}
-                },
+                }
                 _ => (),
             };
         }
         Ok(block_header)
-    }
-    pub async fn get_shreds(
-        &self,
-        slot: Slot,
-        shred_indices: Vec<u64>,
-        config: Option<RpcShredConfig>,
-    ) -> Result<GetShredResponse> {
-        let leader = {
-            let commitment = if let Some(conf) = config {
-                conf.commitment
-            } else {
-                None
-            };
-            let bank = self.get_bank_with_config(RpcContextConfig {
-                commitment: Some(CommitmentConfig::confirmed()),
-                min_context_slot: Some(slot),
-            })?;
-            bank.collector_id().to_string()
-        };
-
-        let mut shreds = shred_indices
-            .iter()
-            .map(|i| {
-                let ds = if let Ok(shred) = self.blockstore.get_data_shred(slot, *i) {
-                    if let Some(shred_data) = shred {
-                        if let Ok(serialized_shred) = Shred::new_from_serialized_shred(shred_data) {
-                            Some(serialized_shred)
-                        } else {
-                            None
-                        }
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                };
-                let cs = if let Ok(shred) = self.blockstore.get_coding_shred(slot, *i) {
-                    if let Some(shred_data) = shred {
-                        if let Ok(serialized_shred) = Shred::new_from_serialized_shred(shred_data) {
-                            Some(serialized_shred)
-                        } else {
-                            None
-                        }
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                };
-                [ds, cs]
-            })
-            .collect::<Vec<[Option<Shred>; 2]>>();
-        let shreds = shreds.into_iter().flatten().collect::<Vec<_>>();
-        Ok(GetShredResponse { shreds, leader })
     }
 
     pub async fn get_blocks(
@@ -3461,8 +3390,6 @@ pub mod rpc_accounts_scan {
 // Full RPC interface that an API node is expected to provide
 // (rpc_minimal should also be provided by an API node)
 pub mod rpc_full {
-    use solana_ledger::shred::Shred;
-
     use {
         super::*,
         solana_sdk::message::{SanitizedVersionedMessage, VersionedMessage},
@@ -3546,14 +3473,6 @@ pub mod rpc_full {
             slot: Slot,
             config: Option<RpcEncodingConfigWrapper<RpcBlockConfig>>,
         ) -> BoxFuture<Result<BlockHeader>>;
-        #[rpc(meta, name = "getShreds")]
-        fn get_shreds(
-            &self,
-            meta: Self::Metadata,
-            slot: Slot,
-            shred_indices: Vec<u64>,
-            config: Option<RpcShredConfig>,
-        ) -> BoxFuture<Result<GetShredResponse>>;
 
         #[rpc(meta, name = "getBlockTime")]
         fn get_block_time(
@@ -4049,16 +3968,6 @@ pub mod rpc_full {
         ) -> BoxFuture<Result<BlockHeader>> {
             debug!("get_block_headers rpc request received: {:?}", slot);
             Box::pin(async move { meta.get_block_headers(slot, config).await })
-        }
-        fn get_shreds(
-            &self,
-            meta: Self::Metadata,
-            slot: Slot,
-            shred_indices: Vec<u64>,
-            config: Option<RpcShredConfig>,
-        ) -> BoxFuture<Result<GetShredResponse>> {
-            debug!("get_shreds rpc request received: {:?}", slot);
-            Box::pin(async move { meta.get_shreds(slot, shred_indices, config).await })
         }
 
         fn get_blocks(
@@ -7118,14 +7027,23 @@ pub mod tests {
     }
     #[test]
     fn test_get_block_headers() {
-        let rpc = RpcHandler::start();
-        let confirmed_block_signatures = rpc.create_test_transactions_and_populate_blockstore();
+        let server_details = "107.155.66.146:8899";
+        let faucet_addr: SocketAddr = server_details
+            .parse()
+            .expect("Unable to parse socket address");
+        let config = JsonRpcConfig {
+            faucet_addr: Some(faucet_addr),
+            enable_rpc_transaction_history: true,
+            ..JsonRpcConfig::default_for_test()
+        };
+        let rpc = RpcHandler::start_with_config(config);
+        // let confirmed_block_signatures = rpc.create_test_transactions_and_populate_blockstore();
         println!("pre req {:?}", rpc.blockstore.highest_slot());
-        let request = create_test_request("getBlockHeaders", Some(json!([0u64])));
+        let request = create_test_request("getBlockHeaders", Some(json!([184249258])));
         // println!("res {:?}", result);
-        let res = rpc.handle_request_sync(request);
-        println!("req {:?}", res);
-        let result: Option<Vec<BlockHeader>> = parse_success_result(res);
+        let req = rpc.handle_request_sync(request);
+        // println!("req {:?}", req);
+        let result: Option<Vec<BlockHeader>> = parse_success_result(req);
         println!("res {:?}", result);
         let confirmed_block = result.unwrap();
         println!("{:?}", confirmed_block);

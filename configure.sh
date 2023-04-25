@@ -1,3 +1,5 @@
+sudo touch solana-validator.log 
+
 sudo bash -c 'cat >> /etc/sysctl.conf <<- EOF
 # set minimum, default, and maximum tcp buffer sizes (10k, 87.38k (linux default), 12M resp)
 net.ipv4.tcp_rmem=10240 87380 12582912
@@ -37,3 +39,13 @@ net.core.wmem_default=134217728
 EOF'
 
 sudo sysctl -p
+
+sudo mkdir /mnt/accounts
+sudo mkdir /mnt/ledger
+sudo mkdir /mnt/snapshots
+
+sudo mount -o size=160G -t tmpfs none /mnt/accounts # incase it overflows just move it to a non ramdisk in /mnt(anyway with pcie nvme ssd u dont benefit much from ramdisk)
+sudo mount -o size=80G -t tmpfs none /mnt/snapshots
+sudo mount -o size=80G -t tmpfs none /mnt/ledger
+
+sudo ls -la /mnt

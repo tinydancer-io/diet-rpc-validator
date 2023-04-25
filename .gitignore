@@ -5,10 +5,10 @@
 /solana-metrics.tar.bz2
 /target/
 /test-ledger/
-
+/tmp-ledger/
 **/*.rs.bk
 .cargo
-
+*.out
 /config/
 
 .cache
