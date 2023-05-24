@@ -2,6 +2,7 @@
 
 use std::ops::Deref;
 
+use byteorder::{ByteOrder, LittleEndian};
 use itertools::Itertools;
 use serde::Serialize;
 use solana_account_decoder::{
@@ -13,7 +14,7 @@ use solana_ledger::shred::Shred;
 use solana_runtime::{account_info::AccountInfo, vote_parser::ParsedVote};
 use solana_sdk::{instruction::CompiledInstruction, message::AccountKeys};
 use solana_transaction_status::{
-    parse_instruction::ParsedInstructionEnum, BlockHeader, EncodedTransaction,
+    parse_instruction::ParsedInstructionEnum, BlockHeader, EncodedTransaction, TransactionProof,
     UiCompiledInstruction, UiInstruction, UiParsedInstruction, UiPartiallyDecodedInstruction,
     UiTransaction,
 };
@@ -1287,6 +1288,86 @@ impl JsonRpcRequestProcessor {
         Ok(block_header)
     }
 
+    pub async fn get_transaction_proof(
+        &self,
+        slot: Slot,
+        signature: String,
+        config: Option<RpcEncodingConfigWrapper<RpcBlockConfig>>,
+    ) -> Result<TransactionProof> {
+        let user_signature = Signature::from_str(&signature);
+        if user_signature.is_err() {
+            return Err(RpcCustomError::TransactionSignatureVerificationFailure.into());
+        }
+        let slot_entries = self
+            .blockstore
+            .get_slot_entries_with_shred_info(slot, 0, false);
+        if slot_entries.is_err() {
+            return Err(RpcCustomError::BlockNotAvailable { slot }.into());
+        }
+        let (entries, _, is_full) = slot_entries.unwrap();
+        let user_entry = entries.iter().find_map(|entry| {
+            entry
+                .transactions
+                .iter()
+                .find(|tx| tx.signatures[0] == *user_signature.as_ref().unwrap())
+        });
+        if let Some(user_entry) = user_entry {
+            // validate entry
+        }
+        // need full shreds
+        if !is_full {
+            return Err(RpcCustomError::BlockNotAvailable { slot }.into());
+        }
+
+        let bank_forks = self.bank_forks.read().unwrap();
+        let bank = bank_forks.get(slot);
+
+        if bank.is_none() {
+            return Err(RpcCustomError::BlockNotAvailable { slot }.into());
+        }
+        let bank = bank.unwrap();
+
+        // bank needs to be fully processed
+        if !bank.is_complete() {
+            return Err(RpcCustomError::BlockNotAvailable { slot }.into());
+        }
+
+        let parent_hash = bank.parent_hash();
+        // let accounts_delta_hash = bank
+        //     .rc
+        //     .accounts
+        //     .accounts_db
+        //     .calculate_accounts_hash_from_index(slot)
+        //     .0;
+        let bank_hash_info = bank.rc.accounts.bank_hash_info_at(bank.slot());
+        let accounts_delta_hash = bank_hash_info.accounts_delta_hash;
+        let mut signature_count_buf = [0u8; 8];
+        LittleEndian::write_u64(&mut signature_count_buf[..], bank.signature_count());
+
+        // get start_hash for the slot (will be last entry from slot - 1)
+        let prev_slot_entries =
+            self.blockstore
+                .get_slot_entries_with_shred_info(slot - 1, 0, false);
+        if prev_slot_entries.is_err() {
+            return Err(RpcCustomError::BlockNotAvailable { slot }.into());
+        }
+        let (prev_entries, _, _) = prev_slot_entries.unwrap();
+        let last_blockhash = prev_entries.last().unwrap().hash;
+
+        println!("success response ...");
+
+        let resp = TransactionProof {
+            proof: Vec::new(),
+            entries,
+            parent_hash,
+            accounts_delta_hash,
+            signature_count_buf,
+            last_blockhash,
+        };
+        // let resp = bincode::serialize(&resp).unwrap();
+
+        Ok(resp)
+    }
     pub async fn get_shreds(
         &self,
         slot: Slot,
@@ -3447,6 +3528,8 @@ pub mod rpc_accounts_scan {
 // Full RPC interface that an API node is expected to provide
 // (rpc_minimal should also be provided by an API node)
 pub mod rpc_full {
+    use solana_transaction_status::TransactionProof;
+
     use {
         super::*,
         solana_sdk::message::{SanitizedVersionedMessage, VersionedMessage},
@@ -3530,6 +3613,15 @@ pub mod rpc_full {
             slot: Slot,
             config: Option<RpcEncodingConfigWrapper<RpcBlockConfig>>,
         ) -> BoxFuture<Result<BlockHeader>>;
+
+        #[rpc(meta, name = "getTransactionProof")]
+        fn get_transaction_proof(
+            &self,
+            meta: Self::Metadata,
+            slot: Slot,
+            signature: String,
+            config: Option<RpcEncodingConfigWrapper<RpcBlockConfig>>,
+        ) -> BoxFuture<Result<TransactionProof>>;
 
         #[rpc(meta, name = "getShreds")]
         fn get_shreds(
@@ -4034,6 +4126,19 @@ pub mod rpc_full {
         ) -> BoxFuture<Result<BlockHeader>> {
             debug!("get_block_headers rpc request received: {:?}", slot);
             Box::pin(async move { meta.get_block_headers(slot, config).await })
+        }
+        fn get_transaction_proof(
+            &self,
+            meta: Self::Metadata,
+            slot: Slot,
+            signature: String,
+            config: Option<RpcEncodingConfigWrapper<RpcBlockConfig>>,
+        ) -> BoxFuture<Result<TransactionProof>> {
+            debug!(
+                "get_transaction_proof rpc request received: {:?} {:?}",
+                slot, signature
+            );
+            Box::pin(async move { meta.get_transaction_proof(slot, signature, config).await })
         }
         fn get_shreds(
             &self,

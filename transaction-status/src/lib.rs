@@ -8,9 +8,11 @@ use {
         parse_instruction::{parse, ParsedInstruction},
     },
     solana_account_decoder::parse_token::UiTokenAmount,
+    solana_entry::entry::Entry,
     solana_sdk::{
         clock::{Slot, UnixTimestamp},
         commitment_config::CommitmentConfig,
+        hash::Hash,
         instruction::CompiledInstruction,
         message::{
             v0::{self, LoadedAddresses, LoadedMessage, MessageAddressTableLookup},
@@ -758,6 +760,17 @@ pub struct BlockHeader {
     pub vote_signature: Vec<Option<String>>,
     pub validator_identity: Vec<Option<Pubkey>>,
     pub validator_stake: Vec<Option<u64>>,
+}
+
+#[derive(Debug, PartialEq, Serialize, Deserialize, Clone, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct TransactionProof {
+    pub proof: Vec<u8>,
+    pub entries: Vec<Entry>,
+    pub parent_hash: Hash,
+    pub accounts_delta_hash: Hash,
+    pub signature_count_buf: [u8; 8],
+    pub last_blockhash: Hash,
 }
 
 #[derive(Clone, Debug, PartialEq)]
